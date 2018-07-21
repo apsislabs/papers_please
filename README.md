@@ -4,6 +4,48 @@ A roles and permissions gem from Apsis Labs.
 
 **NOTE**: Still under heavy development, definitely not suitable for anything remotely resembling production usage.
 
+## Example
+
+```ruby
+class AccessPolicy < PapersPlease::Policy
+    config do
+        role :admin, (proc { |user| u.admin? }) do
+            grant :manage, Post do |user, _post|
+                # all Posts
+                Post.all
+            end
+        end
+
+        role :editor, (proc { |user| u.editor? }) do
+            grant [:read, :update], Post do |user, _post|
+                # just Posts in the user's org
+                Post.where(org: user.org)
+            end
+        end
+
+        role :contributor, (proc { |user| u.contributor? }) do
+            grant [:read, :update], Post do |user, _post|
+                # just user's posts
+                Post.where(user: user)
+            end
+        end
+    end
+end
+
+
+class Controller < ApplicationController
+    def index
+        # returns different objects depending on current_user
+        @posts = scope_for(:read, Post)
+    end
+
+    def show
+        @post = Post.find(params[:id])
+        authorize! :read, @post
+    end
+end
+```
+
 ## Installation
 
 Add this line to your application's Gemfile:
