@@ -33,7 +33,7 @@ module PapersPlease
           end
         else
           add_scope a, klass { klass.all }
-          can a, klass
+          add_permission a, klass
         end
       end
     end
@@ -52,8 +52,7 @@ module PapersPlease
 
     def find_permission(action, subject)
       permissions.detect do |permission|
-        permission.action == action &&
-          permission.subject == subject
+        permission.matches? action, subject
       end
     end
 
@@ -75,8 +74,7 @@ module PapersPlease
 
     def find_scope(action, subject)
       scopes.detect do |scope|
-        scope.action == action &&
-          scope.subject == subject
+        scope.matches? action, subject
       end
     end
 
