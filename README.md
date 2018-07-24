@@ -2,48 +2,97 @@
 
 A roles and permissions gem from Apsis Labs.
 
-**NOTE**: Still under heavy development, definitely not suitable for anything remotely resembling production usage.
+**NOTE**: Still under heavy development, definitely not suitable for anything remotely resembling production usage. Very unlikely to even work.
 
 ## Example
 
 ```ruby
+# app/policies/access_policy.rb
 class AccessPolicy < PapersPlease::Policy
-    config do
-        role :admin, (proc { |user| u.admin? }) do
-            grant :manage, Post do |user, _post|
-                # all Posts
-                Post.all
-            end
-        end
-
-        role :editor, (proc { |user| u.editor? }) do
-            grant [:read, :update], Post do |user, _post|
-                # just Posts in the user's org
-                Post.where(org: user.org)
-            end
-        end
-
-        role :contributor, (proc { |user| u.contributor? }) do
-            grant [:read, :update], Post do |user, _post|
-                # just user's posts
-                Post.where(user: user)
-            end
-        end
+  config do
+    # Define a role in a block
+    role :admin, (proc { |u| u.admin? }) do
+      grant [:manage, :archive], Post
     end
+
+    # Define a role in a class
+    role :member, MemberRole
+
+    # Define a role with no predicate
+    role :guest do
+      grant [:read], Post, predicate: (proc { |u, post| !post.archived? })
+    end
+  end
 end
 
+# app/policies/roles/member_role.rb
+class MemberRole < PapersPlease::Role
+  predicate { |user| user.member? }
 
-class Controller < ApplicationController
-    def index
-        # returns different objects depending on current_user
-        @posts = scope_for(:read, Post)
-    end
+  config do
+    grant :create, Post
+    grant [:read, :update], Post, query: (proc { |u| u.posts })
+    grant :archive, Post, query: method(:published_posts)
+  end
 
-    def show
-        @post = Post.find(params[:id])
-        authorize! :read, @post
-    end
+  private
+
+  def published_posts(user, klass)
+    user.posts.where(status: :published)
+  end
 end
+
+# app/controllers/posts_controller.rb
+class PostsController < ApplicationController
+  # GET /posts
+  def index
+    @posts = policy.query(:read, Post)
+    render json: @posts
+  end
+
+  # GET /posts/:id
+  def show
+    @post = Post.find(params[:id])
+    policy.authorize! :read, @post
+
+    render json: @post
+  end
+
+  # POST /posts/:id/archive
+  def archive
+    @post = Post.find(params[:id])
+    policy.authorize! :archive, @post
+
+    @post.update!(archived: true)
+    render json: @post
+  end
+end
+```
+
+## A helpful CLI
+
+```bash
+$ rails papers_please:roles
+
+# =>
+# | role    | permission | object |
+# | :------ | :--------- | :----- |
+# | :admin  | :create    | Post   |
+# |         | :read      | Post   |
+# |         | :update    | Post   |
+# |         | :destroy   | Post   |
+# |         | :archive   | Post   |
+# |         |            |        |
+# | :member | :create    | Post   |
+# |         | :read      | Post   |
+# |         | :update    | Post   |
+# |         | :archive   | Post   |
+# |         |            |        |
+# | :guest  | :read      | Post   |
+
+$ rails papers_please:annotate [app/policies/access_policy.rb]
+
+# => output roles table to top of AccessPolicy file
 ```
 
 ## Installation
@@ -66,6 +115,15 @@ Or install it yourself as:
 
 TODO: Write usage instructions here
 
+## Theory
+
+The structure of `papers_please` is very simple. At its core, it is a mechanism for storing and retrieving `Procs`. In an authorization context, these `Procs` answer two questions:
+
+1.  Given a specific user and a specific permission, which objects am I allowed to operate on?
+2.  Given a specific user and a specific object, do I have a specific permission?
+
+The machinery of `papers_please` tries to simplify the organization and subsequent access to these questions as much as possible.
+
 ## Development
 
 After checking out the repo, run `bin/setup` to install dependencies. Then, run `rake spec` to run the tests. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
@@ -75,6 +133,10 @@ To install this gem onto your local machine, run `bundle exec rake install`. To 
 ## Contributing
 
 Bug reports and pull requests are welcome on GitHub at https://github.com/wkirby/papers_please.
+
+## Special Thanks
+
+This owes its existence to [`AccessGranted`](https://github.com/chaps-io/access-granted). Thanks!
 
 ## License
 
