@@ -1,6 +1,6 @@
 module PapersPlease
   class Policy
-    attr_accessor :roles, :cache, :config_block
+    attr_accessor :roles, :config_block
     attr_reader :user
 
     def initialize(user)
@@ -14,7 +14,6 @@ module PapersPlease
     # Add a role to the Policy
     def add_role(name, predicate = nil, &block)
       name = name.to_sym
-
       raise DuplicateRole if roles[name].present?
 
       role = Role.new(name, predicate: predicate, definition: block)
@@ -27,15 +26,10 @@ module PapersPlease
     # Look up a stored permission block and call with
     # the current user and subject
     def can?(action, subject = nil)
-      cache[:permission][action] ||= {}
-      return cache[:permission][action][klass] if cache[:permission][action][klass]
-
       applicable_roles.each do |role|
         permission = role.find_permission(action, subject)
-        cache[:permission][action][subject] = permission.applies?(user, subject, action)
+        return permission.applies?(user, subject, action)
       end
-
-      cache[:permission][action][subject]
     end
 
     def cannot?(*args)
@@ -50,15 +44,10 @@ module PapersPlease
     # Look up a stored scope block and call with the
     # current user and class
     def scope_for(action, klass)
-      cache[:scope][action] ||= {}
-      return cache[:scope][action][klass] if cache[:scope][action][klass]
-
       applicable_roles.each do |role|
         scope = role.find_scope(action, klass)
-        cache[:scope][action][klass] = scope.get(user, klass, action)
+        return scope.get(user, klass, action)
       end
-
-      cache[:scope][action][klass]
     end
 
     # Fetch roles that apply to the current user

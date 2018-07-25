@@ -1,54 +1,66 @@
 module PapersPlease
   class Role
-    attr_reader :name, :predicate, :permissions, :scopes
+    attr_reader :name, :predicate, :permissions
 
     def initialize(name, predicate: nil, definition: nil)
       @name = name
       @predicate = predicate
       @permissions = []
-      @scopes = []
 
       instance_eval(&definition)
     end
 
     def applies_to?(user)
-      if @predicate.is_a? Proc
-        @predicate.call(user)
-      else
-        true
-      end
+      return @predicate.call(user) if @predicate.is_a? Proc
+      true
     end
 
-    # Shorthand for calling add_scope and add_permission,
-    # where the add_permission call is a check for
-    # inclusion in the relation from the add_scope call
-    def grant(action, klass, &block)
-      prepare_actions(action).each do |a|
-        if block_given?
-          add_scope a, klass, &block
+    def add_permission(actions, klass, query: nil, predicate: nil)
+      prepare_actions(actions).each do |action|
+        raise DuplicatePermission if permission_exists?(action, klass)
 
-          add_permission a, klass do |u, obj|
-            scope = find_scope(a, klass)
-            scope.call(a, u, klass).include?(obj)
+        has_query = query.is_a?(Proc)
+        has_predicate = predicate.is_a?(Proc)
+        permission = Permission.new(action, klass)
+
+        if has_query && has_predicate
+          # Both query & predicate provided
+
+          permission.query = query
+          permission.predicate = predicate
+        elsif has_query && !has_predicate
+          # Only query provided
+
+          permission.query = query
+
+          if action == :create && actions == :manage
+            # If the action is :create, expanded from :manage
+            # then we set the default all predicate
+            permission.predicate = (proc { true })
+          else
+            # Otherwise the default predicate is to check
+            # for inclusion in the returned relationship
+            permission.predicate = (proc { |user, obj|
+              res = query.call(a, user, klass)
+              return res.include?(obj) if res.respond_to?(:include?)
+              false
+            })
           end
+        elsif !has_query && has_predicate
+          # Only predicate provided
+
+          permission.predicate = predicate
         else
-          add_scope a, klass { klass.all }
-          add_permission a, klass
+          # Neither provided
+
+          permission.query = (proc { klass.all })
+          permission.predicate = (proc { true })
         end
+
+        permissions << permission
       end
     end
-
-    # Permissions
-
-    # Store a block referenced by an symbol and klass
-    # this block should return true or false
-    def add_permission(action, klass, &block)
-      prepare_actions(action).each do |a|
-        raise DuplicatePermission if permission_exists?(a, subject)
-        permissions << Permission.new(a, klass, block)
-      end
-    end
-    alias can add_permission
+    alias grant add_permission
 
     def find_permission(action, subject)
       permissions.detect do |permission|
@@ -57,29 +69,7 @@ module PapersPlease
     end
 
     def permission_exists?(action, subject)
-      !!find_permission(action, subject)
-    end
-
-    # Scopes
-
-    # Store a block referenced by an symbol and klass
-    # this block should return an ActiveRecord::Relation
-    def add_scope(action, klass, &block)
-      prepare_actions(action).each do |a|
-        raise DuplicateScope if scope_exists?(a, subject)
-        scopes << Scope.new(a, klass, block)
-      end
-    end
-    alias scope add_scope
-
-    def find_scope(action, subject)
-      scopes.detect do |scope|
-        scope.matches? action, subject
-      end
-    end
-
-    def scope_exists?(action, subject)
-      !!find_scope(action, subject)
+      find_permission(action, subject).nil?
     end
 
     private
