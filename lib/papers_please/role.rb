@@ -41,9 +41,7 @@ module PapersPlease
             # Otherwise the default predicate is to check
             # for inclusion in the returned relationship
             permission.predicate = (proc { |user, obj|
-              puts "user #{user.inspect}"
               res = query.call(user, klass, action)
-              puts "query result: #{res.inspect}"
               res.respond_to?(:include?) && res.include?(obj)
             })
           end
