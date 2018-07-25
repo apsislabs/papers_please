@@ -11,6 +11,10 @@ module PapersPlease
       configure
     end
 
+    def configure
+      raise NotImplementedError
+    end
+
     # Add a role to the Policy
     def add_role(name, predicate = nil, &block)
       name = name.to_sym
