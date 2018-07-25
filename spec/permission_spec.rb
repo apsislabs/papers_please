@@ -64,5 +64,10 @@ RSpec.describe PapersPlease::Permission do
       expect(stub_proc).to receive(:call).with(:arg).and_return(nil)
       expect(stub_perm.fetch(:arg)).to eq nil
     end
+
+    it 'returns nil if query is not a proc' do
+      perm = subject.new(:read, book, query: "bad query")
+      expect(perm.fetch).to eq nil
+    end
   end
 end
