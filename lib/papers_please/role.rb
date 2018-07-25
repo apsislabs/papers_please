@@ -7,7 +7,7 @@ module PapersPlease
       @predicate = predicate
       @permissions = []
 
-      instance_eval(&definition)
+      instance_eval(&definition) unless definition.nil?
     end
 
     def applies_to?(user)
