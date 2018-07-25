@@ -4,6 +4,20 @@ RSpec.describe PapersPlease::Permission do
   subject { PapersPlease::Permission }
   let(:book) { double('Book') }
 
+  it 'requires a key and subject' do
+    expect { subject.new }.to raise_error(ArgumentError)
+    expect { subject.new(:key) }.to raise_error(ArgumentError)
+    expect { subject.new(:key, book) }.not_to raise_error
+  end
+
+  it 'allows query and predicate' do
+    stub_proc = proc { true }
+    perm = subject.new(:key, book, predicate: stub_proc, query: stub_proc)
+
+    expect(perm.predicate).to be stub_proc
+    expect(perm.query).to be stub_proc
+  end
+
   describe '#matches?' do
     let(:permission) { subject.new(:read, book) }
 
