@@ -10,10 +10,10 @@ module PapersPlease
     end
 
     def matches?(key, subject)
-      key_matches?(key) && subject_matches(subject)
+      key_matches?(key) && subject_matches?(subject)
     end
 
-    def allowed?(*args)
+    def granted?(*args)
       return predicate.call(*args) if predicate.is_a? Proc
       false
     end

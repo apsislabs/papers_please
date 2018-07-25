@@ -41,9 +41,8 @@ module PapersPlease
             # Otherwise the default predicate is to check
             # for inclusion in the returned relationship
             permission.predicate = (proc { |user, obj|
-              res = query.call(a, user, klass)
-              return res.include?(obj) if res.respond_to?(:include?)
-              false
+              res = query.call(user, klass, action)
+              false || res.respond_to?(:include?) && res.include?(obj)
             })
           end
         elsif !has_query && has_predicate
@@ -69,7 +68,7 @@ module PapersPlease
     end
 
     def permission_exists?(action, subject)
-      find_permission(action, subject).nil?
+      !find_permission(action, subject).nil?
     end
 
     private

@@ -1,5 +1,8 @@
-require "bundler/setup"
-require "papers_please"
+require 'bundler/setup'
+require 'byebug'
+require 'papers_please'
+
+Dir['spec/fixtures/**/*.rb'].each { |f| require File.expand_path(f) }
 
 RSpec.configure do |config|
   # Enable flags like --only-failures and --next-failure

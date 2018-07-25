@@ -1,4 +1,6 @@
 module PapersPlease
+  class Error < StandardError; end
+
   class AccessDenied < Error; end
 
   class DuplicatePermission < Error; end
