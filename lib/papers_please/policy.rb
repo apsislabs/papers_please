@@ -12,7 +12,7 @@ module PapersPlease
     end
 
     def configure
-      raise NotImplementedError
+      raise NotImplementedError, "The #configure method of the access policy was not implemented"
     end
 
     # Add a role to the Policy
@@ -43,7 +43,7 @@ module PapersPlease
     end
 
     def authorize!(action, subject)
-      raise AccessDenied.new(action, subject) if cannot?(action, subject)
+      raise AccessDenied.new("Access denied for #{action} on #{subject}") if cannot?(action, subject)
       subject
     end
 

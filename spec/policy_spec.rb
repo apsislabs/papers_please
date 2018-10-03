@@ -58,4 +58,39 @@ RSpec.describe PapersPlease::Policy do
       end
     end
   end
+
+  describe '#can' do
+    it 'returns true for passing predicate' do
+      policy = sample_policy(member)
+      expect(policy.can? :read, post).to be true
+    end
+
+    it 'return false for failing predicate' do
+      policy = sample_policy(member)
+      expect(policy.can? :read, posts.last).to be false
+    end
+  end
+
+  describe '#authorize!' do
+    it 'raises an AccessDenied error for failing predicate' do
+      policy = sample_policy(member)
+      expect { policy.authorize! :read, posts.last }.to raise_error(PapersPlease::AccessDenied)
+    end
+  end
+
+  private
+
+  def sample_policy_klass
+    Class.new(PapersPlease::Policy) do
+      def configure
+        role :member do
+          grant :read, Post, predicate: (proc { |u, p| u.posts.include? p })
+        end
+      end
+    end
+  end
+
+  def sample_policy(user)
+    sample_policy_klass.new(user)
+  end
 end
