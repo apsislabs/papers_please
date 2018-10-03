@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    papers_please (0.0.1.beta)
+    papers_please (0.0.2.beta)
 
 GEM
   remote: https://rubygems.org/

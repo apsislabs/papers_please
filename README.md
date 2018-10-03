@@ -9,7 +9,7 @@ A roles and permissions gem from Apsis Labs.
 ```ruby
 # app/policies/access_policy.rb
 class AccessPolicy < PapersPlease::Policy
-  config do
+  def configure
     # Define a role in a block
     role :admin, (proc { |u| u.admin? }) do
       grant [:manage, :archive], Post
