@@ -27,11 +27,32 @@ module PapersPlease
     end
     alias role add_role
 
+    # Add permissions to the Role
+    def add_permissions(keys)
+      return unless block_given?
+
+      Array(keys).each do |key|
+        raise MissingRole unless roles.key?(key)
+
+        yield roles[key]
+      end
+    end
+    alias permit add_permissions
+
     # Look up a stored permission block and call with
     # the current user and subject
     def can?(action, subject = nil)
       applicable_roles.each do |_, role|
         permission = role.find_permission(action, subject)
+        next if permission.nil?
+
+        # Proxy permission check if granted by other
+        if permission.granted_by_other?
+          granter = permission.granted_by.call(user, subject)
+          permission = role.find_permission(action, granter)
+        end
+
+        # Check permission
         return permission.granted?(user, subject, action) unless permission.nil?
       end
 
@@ -43,7 +64,8 @@ module PapersPlease
     end
 
     def authorize!(action, subject)
-      raise AccessDenied.new("Access denied for #{action} on #{subject}") if cannot?(action, subject)
+      raise AccessDenied, "Access denied for #{action} on #{subject}" if cannot?(action, subject)
+
       subject
     end
 

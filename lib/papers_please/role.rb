@@ -6,12 +6,11 @@ module PapersPlease
       @name = name
       @predicate = predicate
       @permissions = []
-
-      instance_eval(&definition) unless definition.nil?
     end
 
     def applies_to?(user)
       return @predicate.call(user) if @predicate.is_a? Proc
+
       true
     end
 
@@ -30,7 +29,6 @@ module PapersPlease
           permission.predicate = predicate
         elsif has_query && !has_predicate
           # Only query provided
-
           permission.query = query
 
           if action == :create && actions == :manage
@@ -47,7 +45,6 @@ module PapersPlease
           end
         elsif !has_query && has_predicate
           # Only predicate provided
-
           permission.predicate = predicate
         else
           # Neither provided
