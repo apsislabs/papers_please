@@ -10,35 +10,33 @@ A roles and permissions gem from Apsis Labs.
 # app/policies/access_policy.rb
 class AccessPolicy < PapersPlease::Policy
   def configure
-    # Define a role in a block
-    role :admin, (proc { |u| u.admin? }) do
-      grant [:manage, :archive], Post
+    # Define your roles
+    role :super, (proc { |u| u.super? })
+    role :admin, (proc { |u| u.admin? })
+    role :member, (proc { |u| u.member? })
+    role :guest
+
+    permit :super do |role|
+      role.grant [:manage], User
     end
 
-    # Define a role in a class
-    role :member, MemberRole
-
-    # Define a role with no predicate
-    role :guest do
-      grant [:read], Post, predicate: (proc { |u, post| !post.archived? })
+    permit :admin, :super do |role|
+      role.grant [:manage, :archive], Post
     end
-  end
-end
 
-# app/policies/roles/member_role.rb
-class MemberRole < PapersPlease::Role
-  predicate { |user| user.member? }
+    permit :member do |role|
+      role.grant [:create], Post
+      role.grant [:update, :read], Post, query: (proc { |u| u.posts })
+      role.grant [:archive], Post, query: (proc { |u| u.posts }), predicate: (proc { |u, post| !post.archived? })
+    end
 
-  config do
-    grant :create, Post
-    grant [:read, :update], Post, query: (proc { |u| u.posts })
-    grant :archive, Post, query: method(:published_posts)
-  end
+    permit :guest do |role|
+      role.grant [:read], Post, predicate: (proc { |u, post| !post.archived? })
+    end
 
-  private
-
-  def published_posts(user, klass)
-    user.posts.where(status: :published)
+    permit :member, :guest do |role|
+      role.grant [:read], Attachment, granted_by: (proc { |u, attachment| attachment.post })
+    end
   end
 end
 
@@ -65,6 +63,16 @@ class PostsController < ApplicationController
 
     @post.update!(archived: true)
     render json: @post
+  end
+end
+
+class AttachmentsController < ApplicationController
+  # GET /attachments/:id
+  def show
+    @attachment = Attachment.find([:id])
+    policy.authorize! :read, @attachment # => proxied to Post permission check
+
+    send_data @attachment.data, type: @attachment.content_type
   end
 end
 ```

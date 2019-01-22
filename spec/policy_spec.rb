@@ -25,8 +25,10 @@ RSpec.describe PapersPlease::Policy do
       it 'passes user and object to permission check' do
         klass = Class.new(PapersPlease::Policy) do
           def configure
-            role :member do
-              grant :read, Post, predicate: (proc { |u, p| u.spy_method; p.spy_method })
+            role :member
+
+            permit :member do |r|
+              r.grant :read, Post, predicate: (proc { |u, p| u.spy_method; p.spy_method })
             end
           end
         end
@@ -46,8 +48,10 @@ RSpec.describe PapersPlease::Policy do
       it 'passes user and class to scope' do
         klass = Class.new(PapersPlease::Policy) do
           def configure
-            role :member do
-              grant :read, Post, query: (proc { |u, p| u.spy_method; p.spy_method })
+            role :member
+
+            permit :member do |role|
+              role.grant :read, Post, query: (proc { |u, p| u.spy_method; p.spy_method })
             end
           end
         end
@@ -83,8 +87,10 @@ RSpec.describe PapersPlease::Policy do
   def sample_policy_klass
     Class.new(PapersPlease::Policy) do
       def configure
-        role :member do
-          grant :read, Post, predicate: (proc { |u, p| u.posts.include? p })
+        role :member
+
+        permit :member do |role|
+          role.grant :read, Post, predicate: (proc { |u, p| u.posts.include? p })
         end
       end
     end
