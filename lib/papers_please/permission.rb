@@ -22,7 +22,10 @@ module PapersPlease
     def granted?(*args)
       return predicate.call(*args) if predicate.is_a? Proc
 
+      # :nocov:
+      # as far as we can tell this line is unreachable, but just in case...
       false
+      # :nocov:
     end
 
     def fetch(*args)
