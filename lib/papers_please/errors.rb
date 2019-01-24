@@ -3,6 +3,8 @@ module PapersPlease
 
   class AccessDenied < Error; end
 
+  class InvalidGrant < Error; end
+
   class DuplicateRole < Error; end
   class MissingRole < Error; end
 

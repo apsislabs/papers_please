@@ -14,13 +14,19 @@ module PapersPlease
       true
     end
 
-    def add_permission(actions, klass, query: nil, predicate: nil)
+    def add_permission(actions, klass, query: nil, predicate: nil, granted_by: nil)
       prepare_actions(actions).each do |action|
         raise DuplicatePermission if permission_exists?(action, klass)
+        raise InvalidGrant, 'granted_by must be an array of [Class, Proc]' if !granted_by.nil? && !valid_grant?(granted_by)
 
         has_query = query.is_a?(Proc)
         has_predicate = predicate.is_a?(Proc)
         permission = Permission.new(action, klass)
+
+        if granted_by
+          permission.granting_class = granted_by[0]
+          permission.granted_by = granted_by[1]
+        end
 
         if has_query && has_predicate
           # Both query & predicate provided
@@ -68,6 +74,15 @@ module PapersPlease
     end
 
     private
+
+    def valid_grant?(tuple)
+      return false unless tuple.is_a? Array
+      return false unless tuple.length == 2
+      return false unless tuple[0].is_a? Class
+      return false unless tuple[1].is_a? Proc
+
+      return true
+    end
 
     # Wrap actions, translating :manage into :crud
     def prepare_actions(action)

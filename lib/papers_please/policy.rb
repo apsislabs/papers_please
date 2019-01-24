@@ -48,8 +48,11 @@ module PapersPlease
 
         # Proxy permission check if granted by other
         if permission.granted_by_other?
-          granter = permission.granted_by.call(user, subject)
-          permission = role.find_permission(action, granter)
+          # Get proxied subject
+          subject = subject.is_a?(Class) ? permission.granting_class : permission.granted_by.call(user, subject)
+
+          # Get proxied permission
+          permission = role.find_permission(action, subject)
         end
 
         # Check permission

@@ -6,7 +6,9 @@ RSpec.describe PapersPlease do
   context 'access policy' do
     let(:posts) { Array.new(5) { Post.new } }
     let(:post) { posts.first }
+    let(:attachment) { Attachment.new(post: post) }
     let(:restricted_post) { posts.last }
+    let(:restricted_attachment) { Attachment.new(post: restricted_post) }
     let(:other_post) { Post.new }
 
     let(:member) { User.new(posts: posts.slice(0, 3), member: true) }
@@ -22,6 +24,17 @@ RSpec.describe PapersPlease do
           expect(@policy.can?(:read, post)).to be true
           expect(@policy.can?(:update, post)).to be true
           expect(@policy.can?(:destroy, post)).to be true
+          expect(@policy.can?(:read, restricted_post)).to be true
+          expect(@policy.can?(:update, restricted_post)).to be true
+          expect(@policy.can?(:destroy, restricted_post)).to be true
+
+          expect(@policy.can?(:create, Attachment)).to be true
+          expect(@policy.can?(:read, attachment)).to be true
+          expect(@policy.can?(:update, attachment)).to be true
+          expect(@policy.can?(:destroy, attachment)).to be true
+          expect(@policy.can?(:read, restricted_attachment)).to be true
+          expect(@policy.can?(:update, restricted_attachment)).to be true
+          expect(@policy.can?(:destroy, restricted_attachment)).to be true
 
           expect(@policy.can?(:tomato, Post)).to be false
         end
@@ -52,6 +65,7 @@ RSpec.describe PapersPlease do
       describe '#can?' do
         describe '#can?' do
           it 'grants permissions' do
+            # Post
             expect(@policy.can?(:create, Post)).to be true
             expect(@policy.can?(:read, post)).to be true
             expect(@policy.can?(:update, post)).to be true
@@ -61,6 +75,19 @@ RSpec.describe PapersPlease do
             expect(@policy.can?(:update, restricted_post)).to be false
             expect(@policy.can?(:destroy, restricted_post)).to be false
 
+            # Attachments
+            expect(@policy.can?(:create, Attachment)).to be true
+            expect(@policy.can?(:read, attachment)).to be true
+            expect(@policy.can?(:update, attachment)).to be true
+            expect(@policy.can?(:destroy, attachment)).to be true
+
+            expect(@policy.can?(:read, restricted_attachment)).to be false
+            expect(@policy.can?(:update, restricted_attachment)).to be false
+            expect(@policy.can?(:destroy, restricted_attachment)).to be false
+
+            # Invalid
+            expect(@policy.can?(:read, Post)).to be false
+            expect(@policy.can?(:read, Attachment)).to be false
             expect(@policy.can?(:tomato, Post)).to be false
           end
         end

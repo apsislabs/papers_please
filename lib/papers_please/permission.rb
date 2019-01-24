@@ -1,17 +1,18 @@
 module PapersPlease
   class Permission
-    attr_accessor :key, :subject, :query, :predicate
+    attr_accessor :key, :subject, :query, :predicate, :granted_by, :granting_class
 
-    def initialize(key, subject, query: nil, predicate: nil, granted_by: nil)
+    def initialize(key, subject, query: nil, predicate: nil, granted_by: nil, granting_class: nil)
       @key = key
       @subject = subject
       @query = query
       @predicate = predicate
       @granted_by = granted_by
+      @granting_class = granting_class
     end
 
     def granted_by_other?
-      @granted_by.is_a? Proc
+      @granting_class.is_a?(Class) && @granted_by.is_a?(Proc)
     end
 
     def matches?(key, subject)
