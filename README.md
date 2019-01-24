@@ -36,7 +36,7 @@ class AccessPolicy < PapersPlease::Policy
     end
 
     permit :member, :guest do |role|
-      role.grant [:read], Attachment, granted_by: (proc { |u, attachment| attachment.post })
+      role.grant [:read], Attachment, granted_by: [Post, (proc { |u, attachment| attachment.post })]
     end
   end
 end
@@ -84,24 +84,34 @@ end
 $ rails papers_please:roles
 
 # =>
-# | role    | permission | object |
-# | :------ | :--------- | :----- |
-# | :admin  | :create    | Post   |
-# |         | :read      | Post   |
-# |         | :update    | Post   |
-# |         | :destroy   | Post   |
-# |         | :archive   | Post   |
-# |         |            |        |
-# | :member | :create    | Post   |
-# |         | :read      | Post   |
-# |         | :update    | Post   |
-# |         | :archive   | Post   |
-# |         |            |        |
-# | :guest  | :read      | Post   |
-
-$ rails papers_please:annotate [app/policies/access_policy.rb]
-
-# => output roles table to top of AccessPolicy file
+# +---------+------------+------------+------------+----------------+-------------------+
+# | role    | subject    | permission | has query? | has predicate? | granted by other? |
+# +---------+------------+------------+------------+----------------+-------------------+
+# | admin   | Post       | create     | yes        | yes            | no                |
+# |         | Post       | read       | yes        | yes            | no                |
+# |         | Post       | update     | yes        | yes            | no                |
+# |         | Post       | destroy    | yes        | yes            | no                |
+# |         | Attachment | create     | yes        | yes            | no                |
+# |         | Attachment | read       | yes        | yes            | no                |
+# |         | Attachment | update     | yes        | yes            | no                |
+# |         | Attachment | destroy    | yes        | yes            | no                |
+# +---------+------------+------------+------------+----------------+-------------------+
+# | manager | Post       | create     | yes        | yes            | no                |
+# |         | Post       | read       | yes        | yes            | no                |
+# |         | Post       | update     | yes        | yes            | no                |
+# |         | Post       | destroy    | yes        | yes            | no                |
+# |         | Attachment | create     | yes        | yes            | yes               |
+# |         | Attachment | read       | yes        | yes            | yes               |
+# |         | Attachment | update     | yes        | yes            | yes               |
+# |         | Attachment | destroy    | yes        | yes            | yes               |
+# +---------+------------+------------+------------+----------------+-------------------+
+# | member  | Post       | create     | yes        | yes            | no                |
+# |         | Post       | read       | yes        | yes            | no                |
+# |         | Post       | update     | yes        | yes            | no                |
+# |         | Attachment | create     | yes        | yes            | yes               |
+# |         | Attachment | read       | yes        | yes            | yes               |
+# |         | Attachment | update     | yes        | yes            | yes               |
+# +---------+------------+------------+------------+----------------+-------------------+
 ```
 
 ## Installation
