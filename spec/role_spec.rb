@@ -53,6 +53,31 @@ RSpec.describe PapersPlease::Role do
       end
     end
 
+    context 'granted_by' do
+      let (:granted_by) { (proc { |_u, a| a.post }) }
+      let (:granting_class) { Post }
+      let (:role) { PapersPlease::Role.new(:admin) }
+
+      it 'raises exceptions for invalid grants' do
+        expect { role.add_permission(:read, Attachment, granted_by: 'invalid') }.to raise_error PapersPlease::InvalidGrant
+        expect { role.add_permission(:read, Attachment, granted_by: granted_by) }.to raise_error PapersPlease::InvalidGrant
+        expect { role.add_permission(:read, Attachment, granted_by: granting_class) }.to raise_error PapersPlease::InvalidGrant
+        expect { role.add_permission(:read, Attachment, granted_by: []) }.to raise_error PapersPlease::InvalidGrant
+        expect { role.add_permission(:read, Attachment, granted_by: [granted_by, granting_class]) }.to raise_error PapersPlease::InvalidGrant
+
+        expect { role.add_permission(:read, Attachment, granted_by: [granting_class, granted_by]) }.not_to raise_error
+      end
+
+      it 'adds a granted permission' do
+        role.add_permission(:read, Attachment, granted_by: [granting_class, granted_by])
+        expect(role.permissions.size).to eq 1
+        permission = role.permissions.first
+        expect(permission.granted_by_other?).to be true
+        expect(permission.granted_by).to eq granted_by
+        expect(permission.granting_class).to eq granting_class
+      end
+    end
+
     context 'query and predicate' do
       let (:predicate) { (proc { |user| user.admin? }) }
       let (:query) { (proc { [] }) }
