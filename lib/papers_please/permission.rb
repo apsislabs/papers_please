@@ -3,6 +3,11 @@ module PapersPlease
     attr_accessor :key, :subject, :query, :predicate, :granted_by, :granting_class
 
     def initialize(key, subject, query: nil, predicate: nil, granted_by: nil, granting_class: nil)
+      raise ArgumentError, "query must be a Proc, #{query.class} given" if query && !query.is_a?(Proc)
+      raise ArgumentError, "predicate must be a Proc, #{predicate.class} given" if predicate && !predicate.is_a?(Proc)
+      raise ArgumentError, "granted_by must be a Proc, #{granted_by.class} given" if granted_by && !granted_by.is_a?(Proc)
+      raise ArgumentError, "granting_class must be a Class, #{granting_class.class} given" if granting_class && !granting_class.is_a?(Class)
+
       @key = key
       @subject = subject
       @query = query

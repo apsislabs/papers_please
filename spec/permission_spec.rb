@@ -54,9 +54,8 @@ RSpec.describe PapersPlease::Permission do
       expect(stub_perm.granted?(:arg)).to be true
     end
 
-    it 'returns false if query is not a proc' do
-      perm = subject.new(:read, book, predicate: 'bad predicate')
-      expect(perm.granted?).to be false
+    it 'raises exception if predicate is not a proc' do
+      expect { subject.new(:read, book, predicate: 'bad predicate') }.to raise_error ArgumentError
     end
   end
 
@@ -84,9 +83,8 @@ RSpec.describe PapersPlease::Permission do
       expect(stub_perm.fetch(:arg)).to eq nil
     end
 
-    it 'returns nil if query is not a proc' do
-      perm = subject.new(:read, book, query: 'bad query')
-      expect(perm.fetch).to be nil
+    it 'raises exception if query is not a proc' do
+      expect { subject.new(:read, book, query: 'bad query') }.to raise_error ArgumentError
     end
   end
 end
