@@ -81,7 +81,7 @@ module PapersPlease
       return false unless tuple[0].is_a? Class
       return false unless tuple[1].is_a? Proc
 
-      return true
+      true
     end
 
     # Wrap actions, translating :manage into :crud
