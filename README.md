@@ -4,6 +4,7 @@ A roles and permissions gem from Apsis Labs.
 
 **NOTE**: Still under heavy development, definitely not suitable for anything remotely resembling production usage. Very unlikely to even work.
 
+
 ## Example
 
 ```ruby

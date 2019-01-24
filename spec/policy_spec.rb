@@ -27,8 +27,8 @@ RSpec.describe PapersPlease::Policy do
           def configure
             role :member
 
-            permit :member do |r|
-              r.grant :read, Post, predicate: (proc { |u, p| u.spy_method; p.spy_method })
+            permit :member do |role|
+              role.grant :read, Post, predicate: (proc { |u, p| u.spy_method; p.spy_method })
             end
           end
         end
