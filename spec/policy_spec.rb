@@ -66,12 +66,12 @@ RSpec.describe PapersPlease::Policy do
   describe '#can' do
     it 'returns true for passing predicate' do
       policy = sample_policy(member)
-      expect(policy.can? :read, post).to be true
+      expect(policy.can?(:read, post)).to be true
     end
 
     it 'return false for failing predicate' do
       policy = sample_policy(member)
-      expect(policy.can? :read, posts.last).to be false
+      expect(policy.can?(:read, posts.last)).to be false
     end
   end
 

@@ -8,8 +8,9 @@ RSpec.describe PapersPlease do
     let(:post) { posts.first }
     let(:other_post) { Post.new }
 
-    let(:member) { User.new(posts: posts.slice(0, 3), admin: false, member: true) }
-    let(:admin) { User.new(posts: posts, admin: true, member: false) }
+    let(:member) { User.new(posts: posts.slice(0, 3), member: true) }
+    let(:manager) { User.new(posts: posts.slice(0, 3), manager: true) }
+    let(:admin) { User.new(posts: posts, admin: true) }
 
     context 'admin' do
       before(:each) { @policy = AccessPolicy.new(admin) }
@@ -42,6 +43,10 @@ RSpec.describe PapersPlease do
           expect { @policy.authorize! :read, post }.not_to raise_exception
         end
       end
+    end
+
+    context 'manager' do
+      before(:each) { @policy = AccessPolicy.new(manager) }
     end
 
     context 'member' do

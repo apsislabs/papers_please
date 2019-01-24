@@ -12,7 +12,7 @@ module PapersPlease
     end
 
     def configure
-      raise NotImplementedError, "The #configure method of the access policy was not implemented"
+      raise NotImplementedError, 'The #configure method of the access policy was not implemented'
     end
 
     # Add a role to the Policy

@@ -71,8 +71,8 @@ module PapersPlease
 
     # Wrap actions, translating :manage into :crud
     def prepare_actions(action)
-      Array(*[action]).flat_map do |a|
-        a == :manage ? [:create, :read, :update, :destroy] : [a]
+      Array(action).flat_map do |a|
+        a == :manage ? %i[create read update destroy] : [a]
       end
     end
   end
