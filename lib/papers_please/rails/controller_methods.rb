@@ -6,7 +6,7 @@ module PapersPlease
       end
 
       def policy
-        @policy ||= ::PapersPlease.new(current_user)
+        @policy ||= ::PapersPlease::Policy.new(current_user)
       end
 
       def can?(*args)
