@@ -1,3 +1,3 @@
 module PapersPlease
-  VERSION = '0.0.3.beta'.freeze
+  VERSION = '0.1.0.beta'.freeze
 end
