@@ -1,7 +1,8 @@
 PATH
   remote: .
   specs:
-    papers_please (0.0.3.beta)
+    papers_please (0.1.0.beta)
+      terminal-table
 
 GEM
   remote: https://rubygems.org/
@@ -29,12 +30,15 @@ GEM
       json (>= 1.8, < 3)
       simplecov-html (~> 0.10.0)
     simplecov-html (0.10.2)
+    terminal-table (1.8.0)
+      unicode-display_width (~> 1.1, >= 1.1.1)
+    unicode-display_width (1.4.0)
 
 PLATFORMS
   ruby
 
 DEPENDENCIES
-  bundler (~> 1.16)
+  bundler (~> 2.0)
   byebug
   papers_please!
   rake (~> 10.0)
@@ -42,4 +46,4 @@ DEPENDENCIES
   simplecov
 
 BUNDLED WITH
-   1.16.1
+   2.0.1

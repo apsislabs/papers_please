@@ -4,41 +4,40 @@ A roles and permissions gem from Apsis Labs.
 
 **NOTE**: Still under heavy development, definitely not suitable for anything remotely resembling production usage. Very unlikely to even work.
 
+
 ## Example
 
 ```ruby
 # app/policies/access_policy.rb
 class AccessPolicy < PapersPlease::Policy
   def configure
-    # Define a role in a block
-    role :admin, (proc { |u| u.admin? }) do
-      grant [:manage, :archive], Post
+    # Define your roles
+    role :super, (proc { |u| u.super? })
+    role :admin, (proc { |u| u.admin? })
+    role :member, (proc { |u| u.member? })
+    role :guest
+
+    permit :super do |role|
+      role.grant [:manage], User
     end
 
-    # Define a role in a class
-    role :member, MemberRole
-
-    # Define a role with no predicate
-    role :guest do
-      grant [:read], Post, predicate: (proc { |u, post| !post.archived? })
+    permit :admin, :super do |role|
+      role.grant [:manage, :archive], Post
     end
-  end
-end
 
-# app/policies/roles/member_role.rb
-class MemberRole < PapersPlease::Role
-  predicate { |user| user.member? }
+    permit :member do |role|
+      role.grant [:create], Post
+      role.grant [:update, :read], Post, query: (proc { |u| u.posts })
+      role.grant [:archive], Post, query: (proc { |u| u.posts }), predicate: (proc { |u, post| !post.archived? })
+    end
 
-  config do
-    grant :create, Post
-    grant [:read, :update], Post, query: (proc { |u| u.posts })
-    grant :archive, Post, query: method(:published_posts)
-  end
+    permit :guest do |role|
+      role.grant [:read], Post, predicate: (proc { |u, post| !post.archived? })
+    end
 
-  private
-
-  def published_posts(user, klass)
-    user.posts.where(status: :published)
+    permit :member, :guest do |role|
+      role.grant [:read], Attachment, granted_by: [Post, (proc { |u, attachment| attachment.post })]
+    end
   end
 end
 
@@ -67,6 +66,16 @@ class PostsController < ApplicationController
     render json: @post
   end
 end
+
+class AttachmentsController < ApplicationController
+  # GET /attachments/:id
+  def show
+    @attachment = Attachment.find([:id])
+    policy.authorize! :read, @attachment # => proxied to Post permission check
+
+    send_data @attachment.data, type: @attachment.content_type
+  end
+end
 ```
 
 ## A helpful CLI
@@ -75,24 +84,34 @@ end
 $ rails papers_please:roles
 
 # =>
-# | role    | permission | object |
-# | :------ | :--------- | :----- |
-# | :admin  | :create    | Post   |
-# |         | :read      | Post   |
-# |         | :update    | Post   |
-# |         | :destroy   | Post   |
-# |         | :archive   | Post   |
-# |         |            |        |
-# | :member | :create    | Post   |
-# |         | :read      | Post   |
-# |         | :update    | Post   |
-# |         | :archive   | Post   |
-# |         |            |        |
-# | :guest  | :read      | Post   |
-
-$ rails papers_please:annotate [app/policies/access_policy.rb]
-
-# => output roles table to top of AccessPolicy file
+# +---------+------------+------------+------------+----------------+-------------------+
+# | role    | subject    | permission | has query? | has predicate? | granted by other? |
+# +---------+------------+------------+------------+----------------+-------------------+
+# | admin   | Post       | create     | yes        | yes            | no                |
+# |         | Post       | read       | yes        | yes            | no                |
+# |         | Post       | update     | yes        | yes            | no                |
+# |         | Post       | destroy    | yes        | yes            | no                |
+# |         | Attachment | create     | yes        | yes            | no                |
+# |         | Attachment | read       | yes        | yes            | no                |
+# |         | Attachment | update     | yes        | yes            | no                |
+# |         | Attachment | destroy    | yes        | yes            | no                |
+# +---------+------------+------------+------------+----------------+-------------------+
+# | manager | Post       | create     | yes        | yes            | no                |
+# |         | Post       | read       | yes        | yes            | no                |
+# |         | Post       | update     | yes        | yes            | no                |
+# |         | Post       | destroy    | yes        | yes            | no                |
+# |         | Attachment | create     | yes        | yes            | yes               |
+# |         | Attachment | read       | yes        | yes            | yes               |
+# |         | Attachment | update     | yes        | yes            | yes               |
+# |         | Attachment | destroy    | yes        | yes            | yes               |
+# +---------+------------+------------+------------+----------------+-------------------+
+# | member  | Post       | create     | yes        | yes            | no                |
+# |         | Post       | read       | yes        | yes            | no                |
+# |         | Post       | update     | yes        | yes            | no                |
+# |         | Attachment | create     | yes        | yes            | yes               |
+# |         | Attachment | read       | yes        | yes            | yes               |
+# |         | Attachment | update     | yes        | yes            | yes               |
+# +---------+------------+------------+------------+----------------+-------------------+
 ```
 
 ## Installation

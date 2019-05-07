@@ -10,6 +10,13 @@ RSpec.describe PapersPlease::Permission do
     expect { subject.new(:key, book) }.not_to raise_error
   end
 
+  it 'validates arguments' do
+    expect { subject.new(:key, book, query: 'invalid') }.to raise_error(ArgumentError)
+    expect { subject.new(:key, book, predicate: 'invalid') }.to raise_error(ArgumentError)
+    expect { subject.new(:key, book, granted_by: 'invalid') }.to raise_error(ArgumentError)
+    expect { subject.new(:key, book, granting_class: 'invalid') }.to raise_error(ArgumentError)
+  end
+
   it 'allows query and predicate' do
     stub_proc = proc { true }
     perm = subject.new(:key, book, predicate: stub_proc, query: stub_proc)
@@ -53,11 +60,6 @@ RSpec.describe PapersPlease::Permission do
       expect(stub_proc).to receive(:call).with(:arg).and_return(true)
       expect(stub_perm.granted?(:arg)).to be true
     end
-
-    it 'returns false if query is not a proc' do
-      perm = subject.new(:read, book, predicate: 'bad predicate')
-      expect(perm.granted?).to be false
-    end
   end
 
   describe 'fetch' do
@@ -82,11 +84,6 @@ RSpec.describe PapersPlease::Permission do
     it 'calls the predicate proc' do
       expect(stub_proc).to receive(:call).with(:arg).and_return(nil)
       expect(stub_perm.fetch(:arg)).to eq nil
-    end
-
-    it 'returns nil if query is not a proc' do
-      perm = subject.new(:read, book, query: 'bad query')
-      expect(perm.fetch).to be nil
     end
   end
 end

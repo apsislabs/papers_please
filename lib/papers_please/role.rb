@@ -6,22 +6,27 @@ module PapersPlease
       @name = name
       @predicate = predicate
       @permissions = []
-
-      instance_eval(&definition) unless definition.nil?
     end
 
     def applies_to?(user)
       return @predicate.call(user) if @predicate.is_a? Proc
+
       true
     end
 
-    def add_permission(actions, klass, query: nil, predicate: nil)
+    def add_permission(actions, klass, query: nil, predicate: nil, granted_by: nil)
       prepare_actions(actions).each do |action|
         raise DuplicatePermission if permission_exists?(action, klass)
+        raise InvalidGrant, 'granted_by must be an array of [Class, Proc]' if !granted_by.nil? && !valid_grant?(granted_by)
 
         has_query = query.is_a?(Proc)
         has_predicate = predicate.is_a?(Proc)
         permission = Permission.new(action, klass)
+
+        if granted_by
+          permission.granting_class = granted_by[0]
+          permission.granted_by = granted_by[1]
+        end
 
         if has_query && has_predicate
           # Both query & predicate provided
@@ -30,7 +35,6 @@ module PapersPlease
           permission.predicate = predicate
         elsif has_query && !has_predicate
           # Only query provided
-
           permission.query = query
 
           if action == :create && actions == :manage
@@ -47,7 +51,6 @@ module PapersPlease
           end
         elsif !has_query && has_predicate
           # Only predicate provided
-
           permission.predicate = predicate
         else
           # Neither provided
@@ -72,10 +75,19 @@ module PapersPlease
 
     private
 
+    def valid_grant?(tuple)
+      return false unless tuple.is_a? Array
+      return false unless tuple.length == 2
+      return false unless tuple[0].is_a? Class
+      return false unless tuple[1].is_a? Proc
+
+      true
+    end
+
     # Wrap actions, translating :manage into :crud
     def prepare_actions(action)
-      Array(*[action]).flat_map do |a|
-        a == :manage ? [:create, :read, :update, :destroy] : [a]
+      Array(action).flat_map do |a|
+        a == :manage ? %i[create read update destroy] : [a]
       end
     end
   end
