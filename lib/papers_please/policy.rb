@@ -82,6 +82,7 @@ module PapersPlease
 
       nil
     end
+    alias query scope_for
 
     # Fetch roles that apply to the current user
     def applicable_roles
