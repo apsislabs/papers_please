@@ -3,6 +3,7 @@ require 'papers_please/errors'
 require 'papers_please/policy'
 require 'papers_please/role'
 require 'papers_please/permission'
+require 'papers_please/rails/controller_methods'
 require 'papers_please/railtie' if defined? Rails
 
 module PapersPlease
