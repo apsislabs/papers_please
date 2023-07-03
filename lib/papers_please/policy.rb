@@ -1,6 +1,8 @@
 module PapersPlease
   class Policy
     attr_accessor :roles
+
+    attr_reader :fallthrough
     attr_reader :user
 
     def initialize(user)
@@ -9,6 +11,10 @@ module PapersPlease
       @cache         = {}
 
       configure
+    end
+
+    def allow_fallthrough
+      @fallthrough = true
     end
 
     def configure
@@ -41,8 +47,12 @@ module PapersPlease
 
     # Look up a stored permission block and call with
     # the current user and subject
-    def can?(action, subject = nil)
-      applicable_roles.each do |_, role|
+    def can?(action, subject = nil, roles: nil)
+      roles_to_check = roles.nil? ? applicable_roles : get_applicable_roles_by_keys(roles)
+
+      roles_to_check.each do |_, role|
+        next if role.nil?
+
         permission = role.find_permission(action, subject)
         next if permission.nil?
 
@@ -56,7 +66,15 @@ module PapersPlease
         end
 
         # Check permission
-        return permission.granted?(user, subject, action) unless permission.nil?
+        if fallthrough
+          granted = permission.nil? ? false : permission.granted?(user, subject, action)
+          return true if granted
+          next
+        else
+          next if permission.nil?
+
+          return permission.granted?(user, subject, action)
+        end
       end
 
       false
@@ -72,12 +90,35 @@ module PapersPlease
       subject
     end
 
+    def get_applicable_roles_by_keys(keys)
+      keys = [keys] unless keys.is_a?(Array)
+      applicable_roles.slice(*keys)
+    end
+
+    def roles_that_can(action, subject)
+      applicable_roles.select do |_, role|
+        !role.find_permission(action, subject).nil?
+      end.keys
+    end
+
     # Look up a stored scope block and call with the
     # current user and class
-    def scope_for(action, klass)
-      applicable_roles.each do |_, role|
+    def scope_for(action, klass, roles: nil)
+      roles_to_check = roles.nil? ? applicable_roles : get_applicable_roles_by_keys(roles)
+
+      roles_to_check.each do |_, role|
+        next if role.nil?
+
         permission = role.find_permission(action, klass)
-        return permission.fetch(user, klass, action) unless permission.nil?
+
+        if fallthrough
+          fetched = permission.nil? ? nil : permission.fetch(user, klass, action)
+          return fetched unless fetched.nil?
+
+          next
+        else
+          return permission.fetch(user, klass, action) unless permission.nil?
+        end
       end
 
       nil
