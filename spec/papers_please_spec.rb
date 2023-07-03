@@ -5,6 +5,13 @@ RSpec.describe PapersPlease do
     expect(PapersPlease::VERSION).not_to be_nil
   end
 
+  context 'permissions table' do
+    it 'returns a string and does not error' do
+      res = described_class.permissions_table(AccessPolicy)
+      expect(res).to be_a String
+    end
+  end
+
   context 'access policy' do
     let(:posts) { Array.new(5) { Post.new } }
     let(:post) { posts.first }

@@ -45,7 +45,10 @@ module PapersPlease
         end
       end
     end
-    puts table
+
+    puts table.to_s
+
+    table.to_s
   end
   # rubocop:enable Metrics/PerceivedComplexity, Metrics/MethodLength
 end
