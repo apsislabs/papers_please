@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'papers_please/version'
 require 'papers_please/errors'
 require 'papers_please/policy'
@@ -7,6 +9,7 @@ require 'papers_please/rails/controller_methods'
 require 'papers_please/railtie' if defined? Rails
 
 module PapersPlease
+  # rubocop:disable Metrics/PerceivedComplexity, Metrics/MethodLength
   def self.permissions_table(policy_klass)
     require 'terminal-table'
 
@@ -34,7 +37,7 @@ module PapersPlease
               permission.key,
               permission.query ? 'yes' : 'no',
               permission.predicate ? 'yes' : 'no',
-              permission.granted_by_other? ? 'yes' : 'no',
+              permission.granted_by_other? ? 'yes' : 'no'
             ]
 
             first_line_of_role = false
@@ -44,4 +47,5 @@ module PapersPlease
     end
     puts table
   end
+  # rubocop:enable Metrics/PerceivedComplexity, Metrics/MethodLength
 end

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class Post
   attr_accessor :published
 

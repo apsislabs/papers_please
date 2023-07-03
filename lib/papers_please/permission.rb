@@ -1,6 +1,9 @@
+# frozen_string_literal: true
+
 module PapersPlease
   class Permission
-    attr_accessor :key, :subject, :query, :predicate, :granted_by, :granting_class
+    attr_accessor :key, :subject
+    attr_reader :query, :predicate, :granted_by, :granting_class
 
     def initialize(key, subject, query: nil, predicate: nil, granted_by: nil, granting_class: nil)
       self.key = key

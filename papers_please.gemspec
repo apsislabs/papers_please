@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 lib = File.expand_path('lib', __dir__)
 $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 require 'papers_please/version'
@@ -24,7 +26,9 @@ Gem::Specification.new do |spec|
 
   spec.add_development_dependency 'bundler', '~> 2.0'
   spec.add_development_dependency 'byebug'
-  spec.add_development_dependency 'rake', '~> 10.0'
-  spec.add_development_dependency 'rspec', '~> 3.0'
+  spec.add_development_dependency 'rake', '~> 13.0'
+  spec.add_development_dependency 'rspec', '~> 3.12'
+  spec.add_development_dependency 'rubocop', '= 1.38.0'
+  spec.add_development_dependency 'rubocop-rspec'
   spec.add_development_dependency 'simplecov'
 end

@@ -1,7 +1,10 @@
+# frozen_string_literal: true
+
 require 'spec_helper'
 
 RSpec.describe PapersPlease::Permission do
-  subject { PapersPlease::Permission }
+  subject { described_class }
+
   let(:book) { double('Book') }
 
   it 'requires a key and subject' do
@@ -64,7 +67,7 @@ RSpec.describe PapersPlease::Permission do
 
   describe 'fetch' do
     let(:array_permission) { subject.new(:read, book, query: proc { [] }) }
-    let(:empty_permission) { subject.new(:read, book, query: proc { nil }) }
+    let(:empty_permission) { subject.new(:read, book, query: proc {}) }
     let(:stub_proc) { proc { [] } }
     let(:stub_perm) { subject.new(:read, book, query: stub_proc) }
 
@@ -73,7 +76,7 @@ RSpec.describe PapersPlease::Permission do
     end
 
     it 'is nil for nil permission' do
-      expect(empty_permission.fetch).to eq nil
+      expect(empty_permission.fetch).to be_nil
     end
 
     it 'calls the predicate proc' do
@@ -83,7 +86,7 @@ RSpec.describe PapersPlease::Permission do
 
     it 'calls the predicate proc' do
       expect(stub_proc).to receive(:call).with(:arg).and_return(nil)
-      expect(stub_perm.fetch(:arg)).to eq nil
+      expect(stub_perm.fetch(:arg)).to be_nil
     end
   end
 end

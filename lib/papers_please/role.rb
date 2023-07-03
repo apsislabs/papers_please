@@ -2,7 +2,7 @@ module PapersPlease
   class Role
     attr_reader :name, :predicate, :permissions
 
-    def initialize(name, predicate: nil, definition: nil)
+    def initialize(name, predicate: nil)
       @name = name
       @predicate = predicate
       @permissions = []
@@ -17,48 +17,20 @@ module PapersPlease
     def add_permission(actions, klass, query: nil, predicate: nil, granted_by: nil)
       prepare_actions(actions).each do |action|
         raise DuplicatePermission if permission_exists?(action, klass)
-        raise InvalidGrant, 'granted_by must be an array of [Class, Proc]' if !granted_by.nil? && !valid_grant?(granted_by)
 
-        has_query = query.is_a?(Proc)
-        has_predicate = predicate.is_a?(Proc)
-        permission = Permission.new(action, klass)
-
-        if granted_by
-          permission.granting_class = granted_by[0]
-          permission.granted_by = granted_by[1]
+        if !granted_by.nil? && !valid_grant?(granted_by)
+          raise InvalidGrant,
+                'granted_by must be an array of [Class, Proc]'
         end
 
-        if has_query && has_predicate
-          # Both query & predicate provided
-
-          permission.query = query
-          permission.predicate = predicate
-        elsif has_query && !has_predicate
-          # Only query provided
-          permission.query = query
-
-          if action == :create && actions == :manage
-            # If the action is :create, expanded from :manage
-            # then we set the default all predicate
-            permission.predicate = (proc { true })
-          else
-            # Otherwise the default predicate is to check
-            # for inclusion in the returned relationship
-            permission.predicate = (proc { |user, obj|
-              res = query.call(user, klass, action)
-              res.respond_to?(:include?) && res.include?(obj)
-            })
-          end
-        elsif !has_query && has_predicate
-          # Only predicate provided
-          permission.predicate = predicate
-        else
-          # Neither provided
-          permission.query = (proc { klass.all })
-          permission.predicate = (proc { true })
-        end
-
-        permissions << permission
+        permissions << make_permission(
+          action,
+          actions,
+          klass,
+          query: query,
+          predicate: predicate,
+          granted_by: granted_by
+        )
       end
     end
     alias grant add_permission
@@ -88,6 +60,58 @@ module PapersPlease
     def prepare_actions(action)
       Array(action).flat_map do |a|
         a == :manage ? %i[create read update destroy] : [a]
+      end
+    end
+
+    # rubocop:disable Metrics/MethodLength
+    def make_permission(action, actions, klass, query: nil, predicate: nil, granted_by: nil)
+      has_query = query.is_a?(Proc)
+      has_predicate = predicate.is_a?(Proc)
+      permission = make_base_permission(action, klass, granted_by: granted_by)
+
+      if has_query && has_predicate
+        # Both query & predicate provided
+        permission.query = query
+        permission.predicate = predicate
+      elsif has_query && !has_predicate
+        # Only query provided
+        permission.query = query
+        permission.predicate = build_predicate_from_query(action, actions, klass, query)
+      elsif !has_query && has_predicate
+        # Only predicate provided
+        permission.predicate = predicate
+      else
+        # Neither provided
+        permission.query = (proc { klass.all })
+        permission.predicate = (proc { true })
+      end
+
+      permission
+    end
+
+    # rubocop:enable Metrics/MethodLength
+
+    def make_base_permission(action, klass, granted_by: nil)
+      permission = Permission.new(action, klass)
+
+      if granted_by
+        permission.granting_class = granted_by[0]
+        permission.granted_by = granted_by[1]
+      end
+
+      permission
+    end
+
+    def build_predicate_from_query(action, actions, klass, query)
+      # If the action is :create, expanded from :manage
+      # then we set the default all predicate
+      return (proc { true }) if action == :create && actions == :manage
+
+      # Otherwise the default predicate is to check
+      # for inclusion in the returned relationship
+      proc do |user, obj|
+        res = query.call(user, klass, action)
+        res.respond_to?(:include?) && res.include?(obj)
       end
     end
   end

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module PapersPlease
   class Error < StandardError; end
 

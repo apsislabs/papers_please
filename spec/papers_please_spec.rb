@@ -1,6 +1,8 @@
+# frozen_string_literal: true
+
 RSpec.describe PapersPlease do
   it 'has a version number' do
-    expect(PapersPlease::VERSION).not_to be nil
+    expect(PapersPlease::VERSION).not_to be_nil
   end
 
   context 'access policy' do
@@ -16,7 +18,7 @@ RSpec.describe PapersPlease do
     let(:admin) { User.new(posts: posts, admin: true) }
 
     context 'admin' do
-      before(:each) { @policy = AccessPolicy.new(admin) }
+      before { @policy = AccessPolicy.new(admin) }
 
       describe '#can?' do
         it 'grants permissions' do
@@ -52,7 +54,7 @@ RSpec.describe PapersPlease do
     end
 
     context 'manager' do
-      before(:each) { @policy = AccessPolicy.new(manager) }
+      before { @policy = AccessPolicy.new(manager) }
 
       describe '#can?' do
         describe '#can?' do
@@ -107,7 +109,7 @@ RSpec.describe PapersPlease do
     end
 
     context 'member' do
-      before(:each) { @policy = AccessPolicy.new(member) }
+      before { @policy = AccessPolicy.new(member) }
 
       describe '#can?' do
         it 'grants permissions correctly' do

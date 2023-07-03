@@ -1,0 +1,137 @@
+require: rubocop-rspec
+
+AllCops:
+  NewCops: enable
+  SuggestExtensions: false
+  TargetRubyVersion: 3.1
+  Include:
+    - 'lib/**/*.rb'
+    - 'spec/**/*.rb'
+    - '**/Gemfile'
+    - '**/Rakefile'
+  Exclude:
+    - 'bin/**/*'
+    - 'spec/fixtures/**/*.rb'
+
+Style/HashSyntax:
+  EnforcedShorthandSyntax: never
+
+Style/Documentation:
+  Enabled: false
+
+Naming/BlockForwarding:
+  Enabled: false
+
+Style/RedundantSelf:
+  Enabled: false
+
+Style/RedundantReturn:
+  Enabled: false
+
+Style/GuardClause:
+  Enabled: false
+
+Style/ClassAndModuleChildren:
+  Enabled: false
+
+Layout/EmptyLinesAroundClassBody:
+  Enabled: false
+
+Style/FrozenStringLiteralComment:
+  Enabled: false
+
+Layout/CommentIndentation:
+  Enabled: false
+
+Layout/LineLength:
+  Max: 120
+
+Metrics/ClassLength:
+  Max: 120
+
+Metrics/CyclomaticComplexity:
+  Max: 10
+
+Metrics/MethodLength:
+  Max: 15
+
+Metrics/AbcSize:
+  Max: 25
+
+Metrics/ParameterLists:
+  Max: 8
+
+Layout/EmptyLineBetweenDefs:
+  AllowAdjacentOneLineDefs: true
+
+Naming/MethodParameterName:
+  AllowedNames:
+    - _
+
+RSpec/ExampleLength:
+  Enabled: false
+
+RSpec/MultipleExpectations:
+  Enabled: false
+
+RSpec/MultipleMemoizedHelpers:
+  Enabled: false
+
+RSpec/NestedGroups:
+  Enabled: false
+
+RSpec/MessageSpies:
+  Enabled: false
+
+RSpec/InstanceVariable:
+  Enabled: false
+
+RSpec/BeforeAfterAll:
+  Enabled: false
+
+RSpec/AnyInstance:
+  Enabled: false
+
+RSpec/ContextWording:
+  Enabled: false
+
+RSpec/FilePath:
+  Enabled: false
+
+RSpec/NamedSubject:
+  Enabled: false
+
+RSpec/StubbedMock:
+  Enabled: false
+
+RSpec/LetSetup:
+  Enabled: false
+
+RSpec/MessageChain:
+  Enabled: false
+
+RSpec/RepeatedDescription:
+  Enabled: false
+
+RSpec/RepeatedExample:
+  Enabled: false
+
+RSpec/ScatteredSetup:
+  Enabled: false
+
+RSpec/UnspecifiedException:
+  Enabled: false
+
+RSpec/VerifiedDoubles:
+  Enabled: false
+
+RSpec/ExpectInHook:
+  Enabled: false
+
+Style/ClassVars:
+  Exclude:
+    - 'lib/slayer/service.rb'
+
+Style/MutableConstant:
+  Exclude:
+    - 'lib/slayer/version.rb'

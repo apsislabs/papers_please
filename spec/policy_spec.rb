@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 RSpec.describe PapersPlease::Policy do
   let(:posts) { Array.new(5) { Post.new } }
   let(:post) { posts.first }
@@ -12,12 +14,12 @@ RSpec.describe PapersPlease::Policy do
     let(:other_member) { User.new(posts: [], member: true) }
 
     it 'raises not implemented if not overriden' do
-      klass = Class.new(PapersPlease::Policy)
+      klass = Class.new(described_class)
       expect { klass.new(member) }.to raise_error(NotImplementedError)
     end
 
     context 'predicate check' do
-      before(:each) do
+      before do
         allow(owner_member).to receive(:spy_method)
         allow(post).to receive(:spy_method)
       end
@@ -28,7 +30,10 @@ RSpec.describe PapersPlease::Policy do
             role :member
 
             permit :member do |role|
-              role.grant :read, Post, predicate: (proc { |u, p| u.spy_method; p.spy_method })
+              role.grant :read, Post, predicate: (proc { |u, p|
+                                                    u.spy_method
+                                                    p.spy_method
+                                                  })
             end
           end
         end
@@ -40,7 +45,7 @@ RSpec.describe PapersPlease::Policy do
     end
 
     context 'query' do
-      before(:each) do
+      before do
         allow(owner_member).to receive(:spy_method)
         allow(Post).to receive(:spy_method)
       end
@@ -51,7 +56,10 @@ RSpec.describe PapersPlease::Policy do
             role :member
 
             permit :member do |role|
-              role.grant :read, Post, query: (proc { |u, p| u.spy_method; p.spy_method })
+              role.grant :read, Post, query: (proc { |u, p|
+                                                u.spy_method
+                                                p.spy_method
+                                              })
             end
           end
         end
@@ -178,7 +186,6 @@ RSpec.describe PapersPlease::Policy do
 
   def sample_fallthrough_policy_klass
     Class.new(PapersPlease::Policy) do
-
       def configure
         allow_fallthrough
 
@@ -190,7 +197,7 @@ RSpec.describe PapersPlease::Policy do
         end
 
         permit :member do |role|
-          role.grant :read, Post, predicate: (proc { |u, p| p.published })
+          role.grant :read, Post, predicate: (proc { |_u, p| p.published })
         end
       end
     end

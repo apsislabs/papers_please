@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class AccessPolicy < PapersPlease::Policy
   def configure
     role :admin, (proc { |user| user.admin? })

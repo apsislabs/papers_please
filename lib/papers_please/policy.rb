@@ -1,9 +1,10 @@
+# frozen_string_literal: true
+
 module PapersPlease
   class Policy
     attr_accessor :roles
 
-    attr_reader :fallthrough
-    attr_reader :user
+    attr_reader :fallthrough, :user
 
     def initialize(user)
       @user          = user
@@ -22,11 +23,11 @@ module PapersPlease
     end
 
     # Add a role to the Policy
-    def add_role(name, predicate = nil, &block)
+    def add_role(name, predicate = nil)
       name = name.to_sym
       raise DuplicateRole if roles.key?(name)
 
-      role = Role.new(name, predicate: predicate, definition: block)
+      role = Role.new(name, predicate: predicate)
       roles[name] = role
 
       role
@@ -48,33 +49,18 @@ module PapersPlease
     # Look up a stored permission block and call with
     # the current user and subject
     def can?(action, subject = nil, roles: nil)
-      roles_to_check = roles.nil? ? applicable_roles : get_applicable_roles_by_keys(roles)
-
-      roles_to_check.each do |_, role|
-        next if role.nil?
-
-        permission = role.find_permission(action, subject)
+      roles_to_check(roles: roles).each do |_, role|
+        permission = role&.find_permission(action, subject)
         next if permission.nil?
 
         # Proxy permission check if granted by other
-        if permission.granted_by_other?
-          # Get proxied subject
-          subject = subject.is_a?(Class) ? permission.granting_class : permission.granted_by.call(user, subject)
-
-          # Get proxied permission
-          permission = role.find_permission(action, subject)
-        end
+        subject, permission = get_proxied_permission(permission, action, subject, role) if permission.granted_by_other?
 
         # Check permission
-        if fallthrough
-          granted = permission.nil? ? false : permission.granted?(user, subject, action)
-          return true if granted
-          next
-        else
-          next if permission.nil?
+        granted = permission_granted?(permission, action, subject)
+        next if granted.nil? || (granted == false && fallthrough)
 
-          return permission.granted?(user, subject, action)
-        end
+        return granted
       end
 
       false
@@ -91,34 +77,27 @@ module PapersPlease
     end
 
     def get_applicable_roles_by_keys(keys)
-      keys = [keys] unless keys.is_a?(Array)
-      applicable_roles.slice(*keys)
+      applicable_roles.slice(*Array(keys))
     end
 
     def roles_that_can(action, subject)
-      applicable_roles.select do |_, role|
-        !role.find_permission(action, subject).nil?
+      applicable_roles.reject do |_, role|
+        role.find_permission(action, subject).nil?
       end.keys
     end
 
     # Look up a stored scope block and call with the
     # current user and class
     def scope_for(action, klass, roles: nil)
-      roles_to_check = roles.nil? ? applicable_roles : get_applicable_roles_by_keys(roles)
-
-      roles_to_check.each do |_, role|
+      roles_to_check(roles: roles).each do |_, role|
         next if role.nil?
 
         permission = role.find_permission(action, klass)
+        scope = permission&.fetch(user, klass, action)
 
-        if fallthrough
-          fetched = permission.nil? ? nil : permission.fetch(user, klass, action)
-          return fetched unless fetched.nil?
+        next if permission.nil? || (scope.nil? && fallthrough)
 
-          next
-        else
-          return permission.fetch(user, klass, action) unless permission.nil?
-        end
+        return scope
       end
 
       nil
@@ -130,6 +109,30 @@ module PapersPlease
       @applicable_roles ||= roles.select do |_, role|
         role.applies_to?(user)
       end
+    end
+
+    private
+
+    def roles_to_check(roles: nil)
+      roles.nil? ? applicable_roles : get_applicable_roles_by_keys(roles)
+    end
+
+    def permission_granted?(permission, action, subject)
+      if fallthrough
+        permission.nil? ? false : permission.granted?(user, subject, action)
+      else
+        permission.nil? ? nil : permission.granted?(user, subject, action)
+      end
+    end
+
+    def get_proxied_permission(permission, action, subject, role)
+      # Get proxied subject
+      subject = subject.is_a?(Class) ? permission.granting_class : permission.granted_by.call(user, subject)
+
+      # Get proxied permission
+      permission = role.find_permission(action, subject)
+
+      [subject, permission]
     end
   end
 end
