@@ -8,6 +8,7 @@ module PapersPlease
 
     def initialize(user)
       @user          = user
+      @default_scope = nil
       @roles         = {}
       @cache         = {}
 
@@ -16,6 +17,10 @@ module PapersPlease
 
     def allow_fallthrough
       @fallthrough = true
+    end
+
+    def default_scope(scope)
+      @default_scope = scope
     end
 
     def configure
@@ -100,7 +105,7 @@ module PapersPlease
         return scope
       end
 
-      nil
+      @default_scope || nil
     end
     alias query scope_for
 
