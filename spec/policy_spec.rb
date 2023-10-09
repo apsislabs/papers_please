@@ -68,6 +68,23 @@ RSpec.describe PapersPlease::Policy do
         expect(owner_member).to have_received(:spy_method)
         expect(Post).to have_received(:spy_method)
       end
+
+      it 'allows you to define a default scope when no role matches the query' do
+        klass = Class.new(PapersPlease::Policy) do
+          def configure
+            role :admin, (proc { |u| u.admin })
+            role :member
+
+            permit :admin do |role|
+              role.grant :read, Post, query: (proc { Post.all })
+            end
+
+            default_scope :default_scope
+          end
+        end
+
+        expect(klass.new(member).scope_for(:read, Post)).to eq :default_scope
+      end
     end
   end
 
