@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    papers_please (0.1.6)
+    papers_please (0.1.7)
       terminal-table
 
 GEM
