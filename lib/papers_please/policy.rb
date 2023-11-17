@@ -86,8 +86,9 @@ module PapersPlease
     end
 
     def roles_that_can(action, subject)
-      applicable_roles.reject do |_, role|
-        role.find_permission(action, subject).nil?
+      applicable_roles.filter do |_, role|
+        permission = role.find_permission(action, subject)
+        permission&.granted?(user, subject, action) || false
       end.keys
     end
 
