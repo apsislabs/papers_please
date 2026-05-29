@@ -2,16 +2,22 @@
 
 module PapersPlease
   class Permission
-    attr_accessor :key, :subject
-    attr_reader :query, :predicate, :granted_by, :granting_class
+    attr_accessor :key, :subject, :collection
+    attr_reader :scope, :predicate, :granted_by, :granting_class
 
-    def initialize(key, subject, query: nil, predicate: nil, granted_by: nil, granting_class: nil)
+    alias_method :query, :scope
+    alias_method :collection?, :collection
+
+    def initialize(key, subject, scope: nil, query: nil, predicate: nil, granted_by: nil, granting_class: nil, collection: false)
+      raise ArgumentError, "cannot pass both :scope and :query" if scope && query
+
       self.key = key
       self.subject = subject
-      self.query = query
+      self.scope = scope || query
       self.predicate = predicate
       self.granted_by = granted_by
       self.granting_class = granting_class
+      self.collection = collection
     end
 
     def granted_by_other?
@@ -23,26 +29,26 @@ module PapersPlease
     end
 
     def granted?(*args)
-      return predicate.call(*args) if predicate.is_a? Proc
+      return predicate.call(*args) if predicate.is_a?(Proc)
 
       # :nocov:
-      # as far as we can tell this line is unreachable, but just in case...
       false
       # :nocov:
     end
 
     def fetch(*args)
-      return query.call(*args) if query.is_a? Proc
+      return scope.call(*args) if scope.is_a?(Proc)
 
       nil
     end
 
-    # Setters
-    def query=(val)
-      raise ArgumentError, "query must be a Proc, #{val.class} given" if val && !val.is_a?(Proc)
+    def scope=(val)
+      raise ArgumentError, "scope must be a Proc, #{val.class} given" if val && !val.is_a?(Proc)
 
-      @query = val
+      @scope = val
     end
+
+    alias_method :query=, :scope=
 
     def predicate=(val)
       raise ArgumentError, "predicate must be a Proc, #{val.class} given" if val && !val.is_a?(Proc)

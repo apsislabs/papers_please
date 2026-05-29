@@ -2,8 +2,14 @@
 
 A roles and permissions gem from Apsis Labs.
 
-**NOTE**: Still under heavy development, definitely not suitable for anything remotely resembling production usage. Very unlikely to even work.
+## How It Works
 
+Authorization boils down to a relationship between three things: a **user**, an **action**, and a **target**. `papers_please` lets you define these relationships in a single policy file using two primitives:
+
+- **`scope:`** — Given a user and an action, which records can they act on? Returns a collection (typically an ActiveRecord relation).
+- **`if:`** — Given a user and a specific record, is this action allowed? Returns a boolean.
+
+When you provide a `scope:` without an `if:`, `papers_please` auto-generates the predicate for you. For **instance-level** permissions (e.g. `:show`, `:edit`), it checks whether the record is included in the scope. For **collection-level** permissions (e.g. `:index`, `:create`), you pass `collection: true` and the predicate becomes unconditionally `true` — the user can access the collection, and the scope controls what they see.
 
 ## Example
 
@@ -11,49 +17,63 @@ A roles and permissions gem from Apsis Labs.
 # app/policies/access_policy.rb
 class AccessPolicy < PapersPlease::Policy
   def configure
-    # Define your roles
-    role :super, (proc { |u| u.super? })
-    role :admin, (proc { |u| u.admin? })
-    role :member, (proc { |u| u.member? })
+    role :admin, proc { |u| u.admin? }
+    role :member, proc { |u| u.member? }
     role :guest
 
-    permit :super do |role|
-      role.grant [:manage], User
-    end
-
-    permit :admin, :super do |role|
-      role.grant [:manage, :archive], Post
+    permit :admin do |role|
+      role.grant %i[index new create], Post, collection: true
+      role.grant %i[show edit update destroy], Post
     end
 
     permit :member do |role|
-      role.grant [:create], Post
-      role.grant [:update, :read], Post, query: (proc { |u| u.posts })
-      role.grant [:archive], Post, query: (proc { |u| u.posts }), predicate: (proc { |u, post| !post.archived? })
+      # Collection actions: member can see the index and create posts
+      role.grant :index, Post, collection: true, scope: proc { |u| u.posts }
+      role.grant :create, Post, collection: true
+
+      # Instance actions: member can view/edit their own posts
+      role.grant %i[show edit update], Post, scope: proc { |u| u.posts }
+
+      # Scope + condition: can archive own posts, but only if not already archived
+      role.grant :archive, Post,
+        scope: proc { |u| u.posts },
+        if: proc { |u, post| !post.archived? }
     end
 
     permit :guest do |role|
-      role.grant [:read], Post, predicate: (proc { |u, post| !post.archived? })
+      role.grant :index, Post, collection: true
+      role.grant :show, Post, if: proc { |_u, post| !post.archived? }
     end
 
+    # Delegated permissions: attachment access is determined by its post
     permit :member, :guest do |role|
-      role.grant [:read], Attachment, granted_by: [Post, (proc { |u, attachment| attachment.post })]
+      role.grant :show, Attachment, through: [Post, proc { |_u, attachment| attachment.post }]
     end
   end
 end
+```
 
-# app/controllers/posts_controller.rb
+### Controller Usage
+
+```ruby
 class PostsController < ApplicationController
   # GET /posts
   def index
-    @posts = policy.query(:read, Post)
+    @posts = policy.scope_for(:index, Post)
     render json: @posts
   end
 
   # GET /posts/:id
   def show
     @post = Post.find(params[:id])
-    policy.authorize! :read, @post
+    policy.authorize! :show, @post
+    render json: @post
+  end
 
+  # POST /posts
+  def create
+    policy.authorize! :create, Post
+    @post = Post.create!(post_params)
     render json: @post
   end
 
@@ -61,58 +81,99 @@ class PostsController < ApplicationController
   def archive
     @post = Post.find(params[:id])
     policy.authorize! :archive, @post
-
     @post.update!(archived: true)
     render json: @post
   end
 end
+```
 
-class AttachmentsController < ApplicationController
-  # GET /attachments/:id
-  def show
-    @attachment = Attachment.find([:id])
-    policy.authorize! :read, @attachment # => proxied to Post permission check
+### Checking Permissions
 
-    send_data @attachment.data, type: @attachment.content_type
+```ruby
+policy = AccessPolicy.new(current_user)
+
+# Can this user perform this action on this record?
+policy.can?(:edit, @post)       # => true/false
+policy.cannot?(:destroy, @post) # => true/false
+
+# Raise if not allowed
+policy.authorize!(:edit, @post) # => raises PapersPlease::AccessDenied
+
+# What records can this user access for this action?
+policy.scope_for(:index, Post)  # => ActiveRecord::Relation
+```
+
+## Collection vs Instance Permissions
+
+This is the most important concept to understand. Actions fall into two categories:
+
+**Collection-level** actions operate on the resource as a whole, not a specific record. Think `:index`, `:new`, `:create`. The question is "can this user access this resource?" not "can this user access this specific record?"
+
+**Instance-level** actions operate on a specific record. Think `:show`, `:edit`, `:update`, `:destroy`. The question is "can this user act on this particular record?"
+
+When you provide a `scope:` and let `papers_please` auto-generate the `if:` predicate:
+
+```ruby
+# Instance: auto-predicate checks record ∈ scope
+role.grant :show, Post, scope: proc { |u| u.posts }
+# policy.can?(:show, some_post) => u.posts.include?(some_post)
+
+# Collection: auto-predicate is always true
+role.grant :index, Post, collection: true, scope: proc { |u| u.posts }
+# policy.can?(:index, Post) => true
+# policy.scope_for(:index, Post) => u.posts
+```
+
+Without `collection: true`, checking `can?(:index, Post)` would try to check whether the `Post` *class* is included in the scoped collection — which is never what you want.
+
+## Role Fallthrough
+
+By default, `papers_please` checks roles in order and returns the result from the **first role that has a matching permission** — even if that result is `false`. This means a denial in an earlier role prevents later roles from granting access.
+
+Calling `allow_fallthrough` in your policy changes this: when a role denies a permission, the check continues to the next applicable role. Access is granted if **any** role allows it, and denied only if **no** role does.
+
+```ruby
+class AccessPolicy < PapersPlease::Policy
+  def configure
+    allow_fallthrough
+
+    role :admin, proc { |u| u.admin? }
+    role :member, proc { |u| u.member? }
+
+    # An admin who is also a member will match both roles.
+    # Without fallthrough, if :admin denies :read, the check stops.
+    # With fallthrough, :member still gets a chance to grant it.
+
+    permit :admin do |role|
+      role.grant :read, Post, scope: proc { |u| u.posts }
+    end
+
+    permit :member do |role|
+      role.grant :read, Post, if: proc { |_u, post| post.published? }
+    end
   end
 end
 ```
 
-## A helpful CLI
+Most real-world policies should use `allow_fallthrough`. Without it, role ordering becomes load-bearing and easy to get wrong.
+
+## Delegated Permissions with `through:`
+
+When a resource's access is determined by a parent, use `through:`:
+
+```ruby
+role.grant :show, Attachment, through: [Post, proc { |_u, attachment| attachment.post }]
+```
+
+This means: "to check if a user can `:show` an `Attachment`, find its `Post` and check whether the user can `:show` that `Post` instead."
+
+## A Helpful CLI
 
 ```bash
 $ rails papers_please:roles
-
-# =>
-# +---------+------------+------------+------------+----------------+-------------------+
-# | role    | subject    | permission | has query? | has predicate? | granted by other? |
-# +---------+------------+------------+------------+----------------+-------------------+
-# | admin   | Post       | create     | yes        | yes            | no                |
-# |         | Post       | read       | yes        | yes            | no                |
-# |         | Post       | update     | yes        | yes            | no                |
-# |         | Post       | destroy    | yes        | yes            | no                |
-# |         | Attachment | create     | yes        | yes            | no                |
-# |         | Attachment | read       | yes        | yes            | no                |
-# |         | Attachment | update     | yes        | yes            | no                |
-# |         | Attachment | destroy    | yes        | yes            | no                |
-# +---------+------------+------------+------------+----------------+-------------------+
-# | manager | Post       | create     | yes        | yes            | no                |
-# |         | Post       | read       | yes        | yes            | no                |
-# |         | Post       | update     | yes        | yes            | no                |
-# |         | Post       | destroy    | yes        | yes            | no                |
-# |         | Attachment | create     | yes        | yes            | yes               |
-# |         | Attachment | read       | yes        | yes            | yes               |
-# |         | Attachment | update     | yes        | yes            | yes               |
-# |         | Attachment | destroy    | yes        | yes            | yes               |
-# +---------+------------+------------+------------+----------------+-------------------+
-# | member  | Post       | create     | yes        | yes            | no                |
-# |         | Post       | read       | yes        | yes            | no                |
-# |         | Post       | update     | yes        | yes            | no                |
-# |         | Attachment | create     | yes        | yes            | yes               |
-# |         | Attachment | read       | yes        | yes            | yes               |
-# |         | Attachment | update     | yes        | yes            | yes               |
-# +---------+------------+------------+------------+----------------+-------------------+
 ```
+
+Prints a table of all roles, subjects, and permissions in your policy.
 
 ## Installation
 
@@ -126,28 +187,35 @@ And then execute:
 
     $ bundle
 
-Or install it yourself as:
+## Upgrading
 
-    $ gem install papers_please
+### Keyword Renames
 
-## Usage
+The following keyword arguments have been renamed. The old names still work but may be deprecated in a future release:
 
-TODO: Write usage instructions here
+| Old | New | Meaning |
+|---|---|---|
+| `query:` | `scope:` | Which records can this user access? |
+| `predicate:` | `if:` | Is this specific action allowed? |
+| `granted_by:` | `through:` | Delegate permission check to a parent |
 
-## Theory
+You cannot pass both the old and new name for the same option.
 
-The structure of `papers_please` is very simple. At its core, it is a mechanism for storing and retrieving `Procs`. In an authorization context, these `Procs` answer two questions:
+### Removed: `:manage` expansion
 
-1.  Given a specific user and a specific permission, which objects am I allowed to operate on?
-2.  Given a specific user and a specific object, do I have a specific permission?
+`:manage` no longer expands to `[:create, :read, :update, :destroy]`. Define your action lists explicitly:
 
-The machinery of `papers_please` tries to simplify the organization and subsequent access to these questions as much as possible.
+```ruby
+# Before
+role.grant :manage, Post
+
+# After
+role.grant %i[create read update destroy], Post
+```
 
 ## Development
 
 After checking out the repo, run `bin/setup` to install dependencies. Then, run `rake spec` to run the tests. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
-
-To install this gem onto your local machine, run `bundle exec rake install`. To release a new version, update the version number in `version.rb`, and then run `bundle exec rake release`, which will create a git tag for the version, push git commits and tags, and push the `.gem` file to [rubygems.org](https://rubygems.org).
 
 ### Releasing
 
@@ -164,7 +232,7 @@ Publishing to RubyGems and creating a GitHub Release are handled automatically b
 
 ## Contributing
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/wkirby/papers_please.
+Bug reports and pull requests are welcome on GitHub at https://github.com/apsislabs/papers_please.
 
 ## Special Thanks
 

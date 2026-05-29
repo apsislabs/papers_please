@@ -30,15 +30,13 @@ RSpec.describe PapersPlease::Role do
   end
 
   describe "#add_permission" do
-    context "manage expansion" do
+    context "manage is treated as a literal action" do
       let(:role) { described_class.new(:admin) }
 
-      it "adds correct permissions" do
+      it "does not expand :manage" do
         role.add_permission(:manage, Post)
-        expect(role.permissions.size).to eq 4
-
-        permission_actions = role.permissions.map(&:key)
-        expect(permission_actions).to contain_exactly(:create, :read, :update, :destroy)
+        expect(role.permissions.size).to eq 1
+        expect(role.permissions.first.key).to eq(:manage)
       end
     end
 
@@ -48,11 +46,6 @@ RSpec.describe PapersPlease::Role do
       it "raises error for duplicates" do
         role.add_permission(:read, Post)
         expect { role.add_permission(:read, Post) }.to raise_error(PapersPlease::DuplicatePermission)
-      end
-
-      it "raises error for duplicates in expansions" do
-        role.add_permission(:read, Post)
-        expect { role.add_permission(:manage, Post) }.to raise_error(PapersPlease::DuplicatePermission)
       end
     end
 
@@ -139,12 +132,6 @@ RSpec.describe PapersPlease::Role do
         expect(admin_role.permissions.size).to eq 1
         expect(admin_role.permissions.first.predicate.call(admin_user, Post)).to be false
       end
-
-      # it 'generates a default true for :manage' do
-      #     manager_role.add_permission(:manage, Post, query: query)
-      #     expect(manager_role.permissions.size).to eq 4
-      #     expect(manager_role.permissions.first.predicate.call(manager_user, Post)).to be true
-      # end
     end
 
     context "only predicate" do

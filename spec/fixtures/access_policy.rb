@@ -7,17 +7,18 @@ class AccessPolicy < PapersPlease::Policy
     role :member, proc { |user| user.member? }
 
     permit :admin do |role|
-      role.grant :manage, Post
-      role.grant :manage, Attachment
+      role.grant %i[create read update destroy], Post
+      role.grant %i[create read update destroy], Attachment
     end
 
     permit :manager do |role|
-      role.grant :manage, Post, query: proc { |u| u.posts }
-      role.grant :manage, Attachment, granted_by: [Post, proc { |_u, a| a.post }]
+      role.grant :create, Post, collection: true
+      role.grant %i[read update destroy], Post, query: proc { |u| u.posts }
+      role.grant %i[create read update destroy], Attachment, granted_by: [Post, proc { |_u, a| a.post }]
     end
 
     permit :member do |role|
-      role.grant :create, Post
+      role.grant :create, Post, collection: true
       role.grant %i[read update], Post, query: proc { |u| u.posts }
       role.grant %i[create read update], Attachment, granted_by: [Post, proc { |_u, a| a.post }]
     end

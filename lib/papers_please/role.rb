@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module PapersPlease
   class Role
     attr_reader :name, :predicate, :permissions
@@ -9,13 +11,15 @@ module PapersPlease
     end
 
     def applies_to?(user)
-      return @predicate.call(user) if @predicate.is_a? Proc
+      return @predicate.call(user) if @predicate.is_a?(Proc)
 
       true
     end
 
-    def add_permission(actions, klass, query: nil, predicate: nil, granted_by: nil)
-      prepare_actions(actions).each do |action|
+    def add_permission(actions, klass, **opts)
+      scope, predicate, granted_by, collection = resolve_opts(opts)
+
+      Array(actions).each do |action|
         raise DuplicatePermission if permission_exists?(action, klass)
 
         if !granted_by.nil? && !valid_grant?(granted_by)
@@ -24,12 +28,8 @@ module PapersPlease
         end
 
         permissions << make_permission(
-          action,
-          actions,
-          klass,
-          query: query,
-          predicate: predicate,
-          granted_by: granted_by
+          action, klass,
+          scope: scope, predicate: predicate, granted_by: granted_by, collection: collection
         )
       end
     end
@@ -47,6 +47,26 @@ module PapersPlease
 
     private
 
+    def resolve_opts(opts)
+      scope = resolve_alias(opts, :scope, :query)
+      predicate = resolve_alias(opts, :if, :predicate)
+      granted_by = resolve_alias(opts, :through, :granted_by)
+      collection = opts.fetch(:collection, false)
+
+      [scope, predicate, granted_by, collection]
+    end
+
+    def resolve_alias(opts, new_name, old_name)
+      has_new = opts.key?(new_name)
+      has_old = opts.key?(old_name)
+
+      if has_new && has_old
+        raise ArgumentError, "cannot pass both :#{new_name} and :#{old_name}"
+      end
+
+      has_new ? opts[new_name] : opts[old_name]
+    end
+
     def valid_grant?(tuple)
       return false unless tuple.is_a? Array
       return false unless tuple.length == 2
@@ -56,43 +76,29 @@ module PapersPlease
       true
     end
 
-    # Wrap actions, translating :manage into :crud
-    def prepare_actions(action)
-      Array(action).flat_map do |a|
-        (a == :manage) ? %i[create read update destroy] : [a]
-      end
-    end
-
-    # rubocop:disable Metrics/MethodLength
-    def make_permission(action, actions, klass, query: nil, predicate: nil, granted_by: nil)
-      has_query = query.is_a?(Proc)
+    def make_permission(action, klass, scope: nil, predicate: nil, granted_by: nil, collection: false)
+      has_scope = scope.is_a?(Proc)
       has_predicate = predicate.is_a?(Proc)
-      permission = make_base_permission(action, klass, granted_by: granted_by)
+      permission = make_base_permission(action, klass, granted_by: granted_by, collection: collection)
 
-      if has_query && has_predicate
-        # Both query & predicate provided
-        permission.query = query
+      if has_scope && has_predicate
+        permission.scope = scope
         permission.predicate = predicate
-      elsif has_query && !has_predicate
-        # Only query provided
-        permission.query = query
-        permission.predicate = build_predicate_from_query(action, actions, klass, query)
-      elsif !has_query && has_predicate
-        # Only predicate provided
+      elsif has_scope
+        permission.scope = scope
+        permission.predicate = collection ? (proc { true }) : build_predicate_from_scope(klass, scope)
+      elsif has_predicate
         permission.predicate = predicate
       else
-        # Neither provided
-        permission.query = (proc { klass.all })
+        permission.scope = (proc { klass.all })
         permission.predicate = (proc { true })
       end
 
       permission
     end
 
-    # rubocop:enable Metrics/MethodLength
-
-    def make_base_permission(action, klass, granted_by: nil)
-      permission = Permission.new(action, klass)
+    def make_base_permission(action, klass, granted_by: nil, collection: false)
+      permission = Permission.new(action, klass, collection: collection)
 
       if granted_by
         permission.granting_class = granted_by[0]
@@ -102,15 +108,9 @@ module PapersPlease
       permission
     end
 
-    def build_predicate_from_query(action, actions, klass, query)
-      # If the action is :create, expanded from :manage
-      # then we set the default all predicate
-      return proc { true } if action == :create && actions == :manage
-
-      # Otherwise the default predicate is to check
-      # for inclusion in the returned relationship
+    def build_predicate_from_scope(klass, scope)
       proc do |user, obj|
-        res = query.call(user, klass, action)
+        res = scope.call(user, klass)
         res.respond_to?(:include?) && res.include?(obj)
       end
     end
