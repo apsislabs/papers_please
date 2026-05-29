@@ -1,0 +1,59 @@
+name: Publish ${{ github.ref_name }}
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Release ${{ github.ref_name }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Build gem
+        run: bundle exec rake build
+
+      - name: Configure RubyGems credentials
+        run: |
+          mkdir -p ~/.gem
+          cat > ~/.gem/credentials <<EOF
+          ---
+          :rubygems_api_key: ${{ secrets.RUBYGEMS_AUTH_TOKEN }}
+          EOF
+          chmod 0600 ~/.gem/credentials
+
+      - name: Publish gem
+        run: gem push pkg/*.gem
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+
+          if [[ "$TAG" =~ \.(pre|rc|beta)(\.|$) ]]; then
+            gh release create \
+              "$TAG" \
+              pkg/*.gem \
+              --title "$TAG" \
+              --generate-notes \
+              --prerelease
+          else
+            gh release create \
+              "$TAG" \
+              pkg/*.gem \
+              --title "$TAG" \
+              --generate-notes
+          fi

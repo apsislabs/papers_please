@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+BUMP_TYPE="${1:-}"
+
+case "$BUMP_TYPE" in
+  major|minor|patch|pre)
+    ;;
+  *)
+    echo "Usage: bin/release [major|minor|patch|pre]" >&2
+    exit 1
+    ;;
+esac
+
+run() {
+  echo "==> $*"
+  "$@"
+}
+
+if [ -n "$(git status --porcelain)" ]; then
+  echo "Git working tree is not clean" >&2
+  exit 1
+fi
+
+CURRENT_BRANCH="$(git branch --show-current)"
+
+if [ "$CURRENT_BRANCH" != "main" ]; then
+  echo "Releases must be cut from main" >&2
+  exit 1
+fi
+
+run bundle exec rake
+
+run bundle exec bump "$BUMP_TYPE" --tag
+
+VERSION="$(bundle exec bump current | awk '{print $NF}')"
+TAG="v${VERSION}"
+
+run git push origin main
+run git push origin "$TAG"
+
+echo
+echo "Released $TAG"
