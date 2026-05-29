@@ -2,8 +2,7 @@
 
 module PapersPlease
   class Permission
-    attr_accessor :key, :subject, :collection, :delegation
-    attr_reader :scope, :predicate
+    attr_reader :key, :subject, :collection, :delegation, :scope, :predicate
 
     alias_method :query, :scope
     alias_method :collection?, :collection
@@ -11,12 +10,12 @@ module PapersPlease
     def initialize(key, subject, scope: nil, query: nil, predicate: nil, delegation: nil, collection: false)
       raise ArgumentError, "cannot pass both :scope and :query" if scope && query
 
-      self.key = key
-      self.subject = subject
-      self.scope = scope || query
-      self.predicate = predicate
-      self.delegation = delegation
-      self.collection = collection
+      @key = key
+      @subject = subject
+      @scope = validate_callable!(scope || query)
+      @predicate = validate_callable!(predicate)
+      @delegation = delegation
+      @collection = collection
     end
 
     def delegated?
@@ -35,36 +34,40 @@ module PapersPlease
       key_matches?(key) && subject_matches?(subject)
     end
 
-    def granted?(*args)
-      return Callable.call(predicate, *args) if predicate
+    def matches_subject?(subject)
+      subject_matches?(subject)
+    end
+
+    def granted?(user, subject)
+      return predicate.call(user, subject) if predicate
 
       # :nocov:
       false
       # :nocov:
     end
 
-    def fetch(*args)
-      return Callable.call(scope, *args) if scope
+    def fetch(user, klass)
+      return scope.call(user, klass) if scope
 
       nil
     end
 
     def scope=(val)
-      validate_callable!(:scope, val)
-      @scope = val
+      @scope = validate_callable!(val)
     end
 
     alias_method :query=, :scope=
 
     def predicate=(val)
-      validate_callable!(:predicate, val)
-      @predicate = val
+      @predicate = validate_callable!(val)
     end
 
     private
 
-    def validate_callable!(name, val)
-      raise ArgumentError, "#{name} must be a Proc, #{val.class} given" if val && !val.is_a?(Proc)
+    def validate_callable!(val)
+      raise ArgumentError, "must be a Proc, #{val.class} given" if val && !val.is_a?(Proc)
+
+      val
     end
 
     def key_matches?(key)

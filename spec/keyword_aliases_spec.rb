@@ -63,25 +63,18 @@ RSpec.describe "Keyword aliases" do
     end
   end
 
-  describe "lambda support" do
+  describe "lambdas work as callables" do
     let(:role) { PapersPlease::Role.new(:test) }
 
-    it "works with single-arg lambda as scope" do
-      role.grant :read, Post, scope: ->(u) { u.posts }
+    it "works as scope" do
+      role.grant :read, Post, scope: ->(u, _klass) { u.posts }
       permission = role.find_permission(:read, post)
 
       expect(permission.granted?(user, post)).to be true
       expect(permission.granted?(user, other_post)).to be false
     end
 
-    it "works with two-arg lambda as scope" do
-      role.grant :read, Post, scope: ->(u, _klass) { u.posts }
-      permission = role.find_permission(:read, post)
-
-      expect(permission.granted?(user, post)).to be true
-    end
-
-    it "works with lambda as if" do
+    it "works as if" do
       role.grant :read, Post, if: ->(u, p) { u.posts.include?(p) }
       permission = role.find_permission(:read, post)
 
@@ -89,7 +82,7 @@ RSpec.describe "Keyword aliases" do
       expect(permission.granted?(user, other_post)).to be false
     end
 
-    it "works with lambda as role predicate" do
+    it "works as role predicate" do
       lambda_role = PapersPlease::Role.new(:test, predicate: ->(u) { u.admin? })
 
       expect(lambda_role.applies_to?(user)).to be true

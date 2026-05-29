@@ -6,6 +6,7 @@ RSpec.describe PapersPlease::Permission do
   subject { described_class }
 
   let(:book) { double("Book") }
+  let(:user) { double("User") }
 
   it "requires a key and subject" do
     expect { subject.new }.to raise_error(ArgumentError)
@@ -26,6 +27,15 @@ RSpec.describe PapersPlease::Permission do
     expect(perm.query).to be stub_proc
   end
 
+  it "has immutable key, subject, collection, and delegation" do
+    perm = subject.new(:key, book)
+
+    expect(perm).not_to respond_to(:key=)
+    expect(perm).not_to respond_to(:subject=)
+    expect(perm).not_to respond_to(:collection=)
+    expect(perm).not_to respond_to(:delegation=)
+  end
+
   describe "#matches?" do
     let(:permission) { subject.new(:read, book) }
 
@@ -38,59 +48,65 @@ RSpec.describe PapersPlease::Permission do
     end
   end
 
+  describe "#matches_subject?" do
+    let(:permission) { subject.new(:read, book) }
+
+    it "matches the subject" do
+      expect(permission.matches_subject?(book)).to be true
+    end
+  end
+
   describe "#granted?" do
-    let(:true_permission) { subject.new(:read, book, predicate: proc { true }) }
-    let(:false_permission) { subject.new(:read, book, predicate: proc { false }) }
-    let(:stub_proc) { proc { true } }
-    let(:stub_perm) { subject.new(:read, book, predicate: stub_proc) }
+    let(:true_permission) { subject.new(:read, book, predicate: proc { |_u, _s| true }) }
+    let(:false_permission) { subject.new(:read, book, predicate: proc { |_u, _s| false }) }
 
     it "is true for true permission" do
-      expect(true_permission.granted?).to be true
+      expect(true_permission.granted?(user, book)).to be true
     end
 
     it "is false for false permission" do
-      expect(false_permission.granted?).to be false
+      expect(false_permission.granted?(user, book)).to be false
     end
 
-    it "calls the predicate proc" do
-      expect(stub_proc).to receive(:call).and_return(true)
-      expect(stub_perm.granted?).to be true
-    end
+    it "passes user and subject to predicate" do
+      called_with = nil
+      perm = subject.new(:read, book, predicate: proc { |u, s|
+        called_with = [u, s]
+        true
+      })
+      perm.granted?(user, book)
 
-    it "calls the predicate proc" do
-      expect(stub_proc).to receive(:call).with(:arg).and_return(true)
-      expect(stub_perm.granted?(:arg)).to be true
+      expect(called_with).to eq [user, book]
     end
   end
 
   describe "#fetch" do
-    let(:array_permission) { subject.new(:read, book, query: proc { [] }) }
-    let(:empty_permission) { subject.new(:read, book, query: proc {}) }
-    let(:stub_proc) { proc { [] } }
-    let(:stub_perm) { subject.new(:read, book, query: stub_proc) }
+    let(:array_permission) { subject.new(:read, book, query: proc { |_u, _k| [] }) }
+    let(:empty_permission) { subject.new(:read, book, query: proc { |_u, _k| }) }
 
     it "is array for array permission" do
-      expect(array_permission.fetch).to eq []
+      expect(array_permission.fetch(user, book)).to eq []
     end
 
     it "is nil for nil permission" do
-      expect(empty_permission.fetch).to be_nil
+      expect(empty_permission.fetch(user, book)).to be_nil
     end
 
-    it "calls the scope proc" do
-      expect(stub_proc).to receive(:call).and_return([])
-      expect(stub_perm.fetch).to eq []
-    end
+    it "passes user and klass to scope" do
+      called_with = nil
+      perm = subject.new(:read, book, query: proc { |u, k|
+        called_with = [u, k]
+        []
+      })
+      perm.fetch(user, book)
 
-    it "calls the scope proc with args" do
-      expect(stub_proc).to receive(:call).with(:arg).and_return(nil)
-      expect(stub_perm.fetch(:arg)).to be_nil
+      expect(called_with).to eq [user, book]
     end
   end
 
   describe "#delegated?" do
     it "is true with a delegation" do
-      delegation = PapersPlease::Delegation.new(Post, proc { |_u, a| a })
+      delegation = PapersPlease::Delegation.new(klass: Post, resolver: proc { |_u, a| a })
       perm = subject.new(:read, book, delegation: delegation)
 
       expect(perm.delegated?).to be true

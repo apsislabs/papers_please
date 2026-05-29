@@ -11,7 +11,7 @@ module PapersPlease
     end
 
     def applies_to?(user)
-      return Callable.call(@predicate, user) if @predicate.is_a?(Proc)
+      return @predicate.call(user) if @predicate.is_a?(Proc)
 
       true
     end
@@ -69,7 +69,7 @@ module PapersPlease
 
       raise InvalidGrant, "through must be a [Class, Proc], got #{through.inspect}" unless valid_delegation?(through)
 
-      Delegation.new(through[0], through[1])
+      Delegation.new(klass: through[0], resolver: through[1])
     end
 
     def valid_delegation?(tuple)
@@ -86,12 +86,12 @@ module PapersPlease
         permission.predicate = predicate
       elsif has_scope
         permission.scope = scope
-        permission.predicate = collection ? (proc { true }) : build_predicate_from_scope(klass, scope)
+        permission.predicate = collection ? (proc { |_u, _s| true }) : build_predicate_from_scope(klass, scope)
       elsif has_predicate
         permission.predicate = predicate
       else
-        permission.scope = (proc { klass.all })
-        permission.predicate = (proc { true })
+        permission.scope = (proc { |_u, _k| klass.all })
+        permission.predicate = (proc { |_u, _s| true })
       end
 
       permission
@@ -99,7 +99,7 @@ module PapersPlease
 
     def build_predicate_from_scope(klass, scope)
       proc do |user, obj|
-        res = Callable.call(scope, user, klass)
+        res = scope.call(user, klass)
         res.respond_to?(:include?) && res.include?(obj)
       end
     end

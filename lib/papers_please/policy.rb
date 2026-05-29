@@ -2,15 +2,12 @@
 
 module PapersPlease
   class Policy
-    attr_accessor :roles
-
-    attr_reader :fallthrough, :user
+    attr_reader :roles, :fallthrough, :user
 
     def initialize(user)
       @user = user
       @default_scope = nil
       @roles = {}
-      @cache = {}
 
       configure
     end
@@ -27,7 +24,6 @@ module PapersPlease
       raise NotImplementedError, "The #configure method of the access policy was not implemented"
     end
 
-    # Add a role to the Policy
     def add_role(name, predicate = nil)
       name = name.to_sym
       raise DuplicateRole if roles.key?(name)
@@ -39,7 +35,6 @@ module PapersPlease
     end
     alias_method :role, :add_role
 
-    # Add permissions to the Role
     def add_permissions(keys)
       return unless block_given?
 
@@ -51,19 +46,21 @@ module PapersPlease
     end
     alias_method :permit, :add_permissions
 
-    # Look up a stored permission block and call with
-    # the current user and subject
     def can?(action, subject = nil, roles: nil)
+      check_subject = subject
+
       roles_to_check(roles: roles).each do |_, role|
-        permission = role&.find_permission(action, subject)
+        permission = role&.find_permission(action, check_subject)
         next if permission.nil?
 
-        # Proxy permission check if granted by other
-        subject, permission = get_proxied_permission(permission, action, subject, role) if permission.granted_by_other?
+        resolved_subject = check_subject
+        if permission.delegated?
+          resolved_subject, permission = resolve_delegation(permission, check_subject, role)
+          next if permission.nil?
+        end
 
-        # Check permission
-        granted = permission_granted?(permission, action, subject)
-        next if granted.nil? || (granted == false && fallthrough)
+        granted = !!permission.granted?(user, resolved_subject)
+        next if !granted && fallthrough
 
         return granted
       end
@@ -88,9 +85,9 @@ module PapersPlease
     def permitted_actions(subject)
       applicable_roles.each_with_object(Set.new) do |(_, role), actions|
         role.permissions.each do |permission|
-          next unless permission.matches?(permission.key, subject)
+          next unless permission.matches_subject?(subject)
           next if actions.include?(permission.key)
-          next unless permission.granted?(user, subject, permission.key)
+          next unless permission.granted?(user, subject)
 
           actions << permission.key
         end
@@ -100,18 +97,16 @@ module PapersPlease
     def roles_that_can(action, subject)
       applicable_roles.filter do |_, role|
         permission = role.find_permission(action, subject)
-        permission&.granted?(user, subject, action) || false
+        permission&.granted?(user, subject) || false
       end.keys
     end
 
-    # Look up a stored scope block and call with the
-    # current user and class
     def scope_for(action, klass, roles: nil)
       roles_to_check(roles: roles).each do |_, role|
         next if role.nil?
 
         permission = role.find_permission(action, klass)
-        scope = permission&.fetch(user, klass, action)
+        scope = permission&.fetch(user, klass)
 
         next if permission.nil? || (scope.nil? && fallthrough) # standard:disable Style/SafeNavigation
 
@@ -122,7 +117,6 @@ module PapersPlease
     end
     alias_method :query, :scope_for
 
-    # Fetch roles that apply to the current user
     def applicable_roles
       @applicable_roles ||= roles.select do |_, role|
         role.applies_to?(user)
@@ -135,20 +129,12 @@ module PapersPlease
       roles.nil? ? applicable_roles : get_applicable_roles_by_keys(roles)
     end
 
-    def permission_granted?(permission, action, subject)
-      if fallthrough
-        permission.nil? ? false : permission.granted?(user, subject, action)
-      else
-        permission&.granted?(user, subject, action)
-      end
-    end
-
-    def get_proxied_permission(permission, action, subject, role)
+    def resolve_delegation(permission, subject, role)
       delegation = permission.delegation
-      subject = subject.is_a?(Class) ? delegation.klass : delegation.resolve(user, subject)
-      permission = role.find_permission(action, subject)
+      resolved = subject.is_a?(Class) ? delegation.klass : delegation.resolve(user, subject)
+      permission = role.find_permission(permission.key, resolved)
 
-      [subject, permission]
+      [resolved, permission]
     end
   end
 end
