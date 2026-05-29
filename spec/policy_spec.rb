@@ -157,13 +157,13 @@ RSpec.describe PapersPlease::Policy do
           role :admin
 
           permit :admin do |role|
-            role.grant :admin, Post
-            role.grant :foo, Post
+            role.grant :admin, Post, allow_all: true
+            role.grant :foo, Post, allow_all: true
           end
 
           permit :member do |role|
-            role.grant :read, Post
-            role.grant :foo, Post
+            role.grant :read, Post, allow_all: true
+            role.grant :foo, Post, allow_all: true
           end
         end
       end
@@ -214,6 +214,23 @@ RSpec.describe PapersPlease::Policy do
       policy = sample_policy(member)
       expect { policy.authorize! :read, posts.last }.to raise_error(PapersPlease::AccessDenied)
     end
+
+    it "does not call subject.to_s when building denial messages" do
+      policy_klass = Class.new(PapersPlease::Policy) do
+        def configure
+          role :member
+        end
+      end
+      evil = Class.new do
+        def to_s
+          raise "to_s should not be called"
+        end
+      end.new
+
+      expect do
+        policy_klass.new(member).authorize!(:read, evil)
+      end.to raise_error(PapersPlease::AccessDenied, /Access denied for :read on/)
+    end
   end
 
   private
@@ -225,7 +242,7 @@ RSpec.describe PapersPlease::Policy do
         role :member, proc { |u| u.member }
 
         permit :admin do |role|
-          role.grant :read, Post
+          role.grant :read, Post, allow_all: true
         end
 
         permit :member do |role|

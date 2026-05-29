@@ -17,10 +17,12 @@ module PapersPlease
     end
 
     def add_permission(actions, klass, **opts)
-      scope, predicate, through, collection = resolve_opts(opts)
+      scope, predicate, through, collection, allow_all = resolve_opts(opts)
 
       Array(actions).each do |action|
         raise DuplicatePermission if permission_exists?(action, klass)
+
+        warn_unconditional_grant(action, klass) if scope.nil? && predicate.nil? && through.nil? && !allow_all
 
         delegation = build_delegation(through)
 
@@ -49,8 +51,9 @@ module PapersPlease
       predicate = resolve_alias(opts, :if, :predicate)
       through = resolve_alias(opts, :through, :granted_by)
       collection = opts.fetch(:collection, false)
+      allow_all = opts.fetch(:allow_all, false)
 
-      [scope, predicate, through, collection]
+      [scope, predicate, through, collection, allow_all]
     end
 
     def resolve_alias(opts, new_name, old_name)
@@ -76,9 +79,14 @@ module PapersPlease
       tuple.is_a?(Array) && tuple.length == 2 && tuple[0].is_a?(Class) && tuple[1].is_a?(Proc)
     end
 
+    def warn_unconditional_grant(action, klass)
+      warn "[papers_please] role.grant #{action.inspect}, #{klass.inspect} grants unconditional access. " \
+        "Pass if:/scope: or allow_all: true to make this explicit."
+    end
+
     def make_permission(action, klass, scope: nil, predicate: nil, delegation: nil, collection: false)
-      has_scope = scope.is_a?(Proc)
-      has_predicate = predicate.is_a?(Proc)
+      has_scope = !scope.nil?
+      has_predicate = !predicate.nil?
       permission = Permission.new(action, klass, delegation: delegation, collection: collection)
 
       if has_scope && has_predicate
@@ -99,8 +107,19 @@ module PapersPlease
 
     def build_predicate_from_scope(klass, scope)
       proc do |user, obj|
-        res = scope.call(user, klass)
-        res.respond_to?(:include?) && res.include?(obj)
+        if klass.is_a?(Class) && obj.is_a?(klass)
+          res = scope.call(user, klass)
+
+          if res.respond_to?(:exists?) && obj.respond_to?(:id)
+            res.exists?(obj.id)
+          elsif res.is_a?(Array)
+            res.include?(obj)
+          else
+            false
+          end
+        else
+          false
+        end
       end
     end
   end

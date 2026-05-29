@@ -75,7 +75,15 @@ module PapersPlease
     end
 
     def subject_matches?(subject)
-      subject == @subject || subject.class <= @subject
+      if subject.is_a?(Class)
+        @subject.is_a?(Class) && !!(subject <= @subject)
+      else
+        # Keep literal subject matching, but put the trusted policy subject on
+        # the left side so an arbitrary runtime object cannot spoof a match by
+        # overriding #==. Class-backed permissions still match instances by
+        # checking the instance's class against the configured subject class.
+        @subject == subject || (@subject.is_a?(Class) && !!(subject.class <= @subject))
+      end
     end
   end
 end

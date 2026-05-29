@@ -33,7 +33,7 @@ RSpec.describe "Collection permissions" do
     end
 
     it "works without a scope" do
-      role.grant :create, Post, collection: true
+      role.grant :create, Post, collection: true, allow_all: true
       permission = role.find_permission(:create, Post)
 
       expect(permission.collection?).to be true

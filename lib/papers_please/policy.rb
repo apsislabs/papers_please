@@ -73,9 +73,9 @@ module PapersPlease
     end
 
     def authorize!(action, subject)
-      raise AccessDenied, "Access denied for #{action} on #{subject}" if cannot?(action, subject)
+      return subject if can?(action, subject)
 
-      subject
+      raise AccessDenied, "Access denied for #{action.inspect} on #{subject_label(subject)}"
     end
 
     def get_applicable_roles_by_keys(keys)
@@ -127,6 +127,16 @@ module PapersPlease
 
     def roles_to_check(roles: nil)
       roles.nil? ? applicable_roles : get_applicable_roles_by_keys(roles)
+    end
+
+    def subject_label(subject)
+      klass = Object.instance_method(:class).bind_call(subject)
+
+      if klass == Class
+        subject.name || "anonymous class"
+      else
+        klass.name || "anonymous #{klass}"
+      end
     end
 
     def resolve_delegation(permission, subject, role)

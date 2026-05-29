@@ -34,7 +34,7 @@ RSpec.describe PapersPlease::Role do
       let(:role) { described_class.new(:admin) }
 
       it "does not expand :manage" do
-        role.add_permission(:manage, Post)
+        role.add_permission(:manage, Post, allow_all: true)
         expect(role.permissions.size).to eq 1
         expect(role.permissions.first.key).to eq(:manage)
       end
@@ -44,8 +44,8 @@ RSpec.describe PapersPlease::Role do
       let(:role) { described_class.new(:admin) }
 
       it "raises error for duplicates" do
-        role.add_permission(:read, Post)
-        expect { role.add_permission(:read, Post) }.to raise_error(PapersPlease::DuplicatePermission)
+        role.add_permission(:read, Post, allow_all: true)
+        expect { role.add_permission(:read, Post, allow_all: true) }.to raise_error(PapersPlease::DuplicatePermission)
       end
     end
 
@@ -87,6 +87,11 @@ RSpec.describe PapersPlease::Role do
       let(:predicate) { proc { |user| user.admin? } }
       let(:query) { proc { [] } }
       let(:role) { described_class.new(:admin) }
+
+      it "raises for non-callable query or predicate values" do
+        expect { role.add_permission(:read, Post, query: "invalid") }.to raise_error(ArgumentError)
+        expect { role.add_permission(:read, Post, predicate: "invalid") }.to raise_error(ArgumentError)
+      end
 
       it "has correct query" do
         role.add_permission(:read, Post, query: query, predicate: predicate)
@@ -132,6 +137,28 @@ RSpec.describe PapersPlease::Role do
         expect(admin_role.permissions.size).to eq 1
         expect(admin_role.permissions.first.predicate.call(admin_user, Post)).to be false
       end
+
+      it "does not trust arbitrary scope objects with include?" do
+        evil_scope = Class.new do
+          def include?(_obj)
+            true
+          end
+        end.new
+
+        admin_role.add_permission(:read, Post, query: proc { evil_scope })
+
+        expect(admin_role.permissions.first.predicate.call(admin_user, included_post)).to be false
+      end
+
+      it "uses exists? for ActiveRecord-like scopes" do
+        relation = double("Relation")
+        allow(relation).to receive(:exists?).with(123).and_return(true)
+        allow(included_post).to receive(:id).and_return(123)
+
+        admin_role.add_permission(:read, Post, query: proc { relation })
+
+        expect(admin_role.permissions.first.predicate.call(admin_user, included_post)).to be true
+      end
     end
 
     context "only predicate" do
@@ -155,16 +182,22 @@ RSpec.describe PapersPlease::Role do
       let(:empty_role) { described_class.new(:admin) }
       let(:klass) { spy("klass") }
 
-      it "creates an all query" do
-        empty_role.add_permission(:read, klass)
+      it "warns about implicit unconditional grants" do
+        expect do
+          empty_role.add_permission(:read, klass)
+        end.to output(/grants unconditional access/).to_stderr
+      end
+
+      it "creates an all query when explicitly allowed" do
+        empty_role.add_permission(:read, klass, allow_all: true)
         expect(empty_role.permissions.size).to eq 1
 
         empty_role.permissions.first.query.call
         expect(klass).to have_received(:all)
       end
 
-      it "creates a true predicate" do
-        empty_role.add_permission(:read, klass)
+      it "creates a true predicate when explicitly allowed" do
+        empty_role.add_permission(:read, klass, allow_all: true)
         expect(empty_role.permissions.first.predicate.call).to be true
       end
     end

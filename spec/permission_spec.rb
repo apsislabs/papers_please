@@ -54,6 +54,33 @@ RSpec.describe PapersPlease::Permission do
     it "matches the subject" do
       expect(permission.matches_subject?(book)).to be true
     end
+
+    it "does not let runtime subjects spoof equality" do
+      post_permission = subject.new(:read, Post)
+      evil = Class.new do
+        def ==(_other)
+          true
+        end
+      end.new
+
+      expect(post_permission.matches_subject?(evil)).to be false
+    end
+
+    it "matches class subjects and subclasses" do
+      subclass = Class.new(Post)
+      post_permission = subject.new(:read, Post)
+
+      expect(post_permission.matches_subject?(Post)).to be true
+      expect(post_permission.matches_subject?(subclass)).to be true
+      expect(post_permission.matches_subject?(subclass.new)).to be true
+    end
+
+    it "matches literal subjects" do
+      literal_permission = subject.new(:read, :dashboard)
+
+      expect(literal_permission.matches_subject?(:dashboard)).to be true
+      expect(literal_permission.matches_subject?(:settings)).to be false
+    end
   end
 
   describe "#granted?" do
