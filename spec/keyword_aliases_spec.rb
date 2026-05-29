@@ -63,6 +63,39 @@ RSpec.describe "Keyword aliases" do
     end
   end
 
+  describe "lambda support" do
+    let(:role) { PapersPlease::Role.new(:test) }
+
+    it "works with single-arg lambda as scope" do
+      role.grant :read, Post, scope: ->(u) { u.posts }
+      permission = role.find_permission(:read, post)
+
+      expect(permission.granted?(user, post)).to be true
+      expect(permission.granted?(user, other_post)).to be false
+    end
+
+    it "works with two-arg lambda as scope" do
+      role.grant :read, Post, scope: ->(u, _klass) { u.posts }
+      permission = role.find_permission(:read, post)
+
+      expect(permission.granted?(user, post)).to be true
+    end
+
+    it "works with lambda as if" do
+      role.grant :read, Post, if: ->(u, p) { u.posts.include?(p) }
+      permission = role.find_permission(:read, post)
+
+      expect(permission.granted?(user, post)).to be true
+      expect(permission.granted?(user, other_post)).to be false
+    end
+
+    it "works with lambda as role predicate" do
+      lambda_role = PapersPlease::Role.new(:test, predicate: ->(u) { u.admin? })
+
+      expect(lambda_role.applies_to?(user)).to be true
+    end
+  end
+
   describe "through: aliases granted_by:" do
     let(:role) { PapersPlease::Role.new(:test) }
     let(:grant_tuple) { [Post, proc { |_u, a| a.post }] }

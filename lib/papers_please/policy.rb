@@ -144,10 +144,8 @@ module PapersPlease
     end
 
     def get_proxied_permission(permission, action, subject, role)
-      # Get proxied subject
-      subject = subject.is_a?(Class) ? permission.granting_class : permission.granted_by.call(user, subject)
-
-      # Get proxied permission
+      delegation = permission.delegation
+      subject = subject.is_a?(Class) ? delegation.klass : delegation.resolve(user, subject)
       permission = role.find_permission(action, subject)
 
       [subject, permission]

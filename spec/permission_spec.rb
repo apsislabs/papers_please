@@ -16,8 +16,6 @@ RSpec.describe PapersPlease::Permission do
   it "validates arguments" do
     expect { subject.new(:key, book, query: "invalid") }.to raise_error(ArgumentError)
     expect { subject.new(:key, book, predicate: "invalid") }.to raise_error(ArgumentError)
-    expect { subject.new(:key, book, granted_by: "invalid") }.to raise_error(ArgumentError)
-    expect { subject.new(:key, book, granting_class: "invalid") }.to raise_error(ArgumentError)
   end
 
   it "allows query and predicate" do
@@ -65,7 +63,7 @@ RSpec.describe PapersPlease::Permission do
     end
   end
 
-  describe "fetch" do
+  describe "#fetch" do
     let(:array_permission) { subject.new(:read, book, query: proc { [] }) }
     let(:empty_permission) { subject.new(:read, book, query: proc {}) }
     let(:stub_proc) { proc { [] } }
@@ -79,14 +77,31 @@ RSpec.describe PapersPlease::Permission do
       expect(empty_permission.fetch).to be_nil
     end
 
-    it "calls the predicate proc" do
+    it "calls the scope proc" do
       expect(stub_proc).to receive(:call).and_return([])
       expect(stub_perm.fetch).to eq []
     end
 
-    it "calls the predicate proc" do
+    it "calls the scope proc with args" do
       expect(stub_proc).to receive(:call).with(:arg).and_return(nil)
       expect(stub_perm.fetch(:arg)).to be_nil
+    end
+  end
+
+  describe "#delegated?" do
+    it "is true with a delegation" do
+      delegation = PapersPlease::Delegation.new(Post, proc { |_u, a| a })
+      perm = subject.new(:read, book, delegation: delegation)
+
+      expect(perm.delegated?).to be true
+      expect(perm.granting_class).to eq Post
+    end
+
+    it "is false without a delegation" do
+      perm = subject.new(:read, book)
+
+      expect(perm.delegated?).to be false
+      expect(perm.granting_class).to be_nil
     end
   end
 end

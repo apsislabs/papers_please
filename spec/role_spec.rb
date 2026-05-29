@@ -50,7 +50,7 @@ RSpec.describe PapersPlease::Role do
     end
 
     context "granted_by" do
-      let(:granted_by) { proc { |_u, a| a.post } }
+      let(:resolver) { proc { |_u, a| a.post } }
       let(:granting_class) { Post }
       let(:role) { described_class.new(:admin) }
 
@@ -59,7 +59,7 @@ RSpec.describe PapersPlease::Role do
           role.add_permission(:read, Attachment, granted_by: "invalid")
         end.to raise_error PapersPlease::InvalidGrant
         expect do
-          role.add_permission(:read, Attachment, granted_by: granted_by)
+          role.add_permission(:read, Attachment, granted_by: resolver)
         end.to raise_error PapersPlease::InvalidGrant
         expect do
           role.add_permission(:read, Attachment, granted_by: granting_class)
@@ -67,18 +67,18 @@ RSpec.describe PapersPlease::Role do
         expect { role.add_permission(:read, Attachment, granted_by: []) }.to raise_error PapersPlease::InvalidGrant
         expect do
           role.add_permission(:read, Attachment,
-            granted_by: [granted_by, granting_class])
+            granted_by: [resolver, granting_class])
         end.to raise_error PapersPlease::InvalidGrant
 
-        expect { role.add_permission(:read, Attachment, granted_by: [granting_class, granted_by]) }.not_to raise_error
+        expect { role.add_permission(:read, Attachment, granted_by: [granting_class, resolver]) }.not_to raise_error
       end
 
-      it "adds a granted permission" do
-        role.add_permission(:read, Attachment, granted_by: [granting_class, granted_by])
+      it "adds a delegated permission" do
+        role.add_permission(:read, Attachment, granted_by: [granting_class, resolver])
         expect(role.permissions.size).to eq 1
         permission = role.permissions.first
-        expect(permission.granted_by_other?).to be true
-        expect(permission.granted_by).to eq granted_by
+        expect(permission.delegated?).to be true
+        expect(permission.delegation.resolver).to eq resolver
         expect(permission.granting_class).to eq granting_class
       end
     end

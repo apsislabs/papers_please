@@ -2,26 +2,33 @@
 
 module PapersPlease
   class Permission
-    attr_accessor :key, :subject, :collection
-    attr_reader :scope, :predicate, :granted_by, :granting_class
+    attr_accessor :key, :subject, :collection, :delegation
+    attr_reader :scope, :predicate
 
     alias_method :query, :scope
     alias_method :collection?, :collection
 
-    def initialize(key, subject, scope: nil, query: nil, predicate: nil, granted_by: nil, granting_class: nil, collection: false)
+    def initialize(key, subject, scope: nil, query: nil, predicate: nil, delegation: nil, collection: false)
       raise ArgumentError, "cannot pass both :scope and :query" if scope && query
 
       self.key = key
       self.subject = subject
       self.scope = scope || query
       self.predicate = predicate
-      self.granted_by = granted_by
-      self.granting_class = granting_class
+      self.delegation = delegation
       self.collection = collection
     end
 
+    def delegated?
+      delegation.is_a?(Delegation)
+    end
+
+    def granting_class
+      delegation&.klass
+    end
+
     def granted_by_other?
-      @granting_class.is_a?(Class) && @granted_by.is_a?(Proc)
+      delegated?
     end
 
     def matches?(key, subject)
@@ -29,7 +36,7 @@ module PapersPlease
     end
 
     def granted?(*args)
-      return predicate.call(*args) if predicate.is_a?(Proc)
+      return Callable.call(predicate, *args) if predicate
 
       # :nocov:
       false
@@ -37,38 +44,28 @@ module PapersPlease
     end
 
     def fetch(*args)
-      return scope.call(*args) if scope.is_a?(Proc)
+      return Callable.call(scope, *args) if scope
 
       nil
     end
 
     def scope=(val)
-      raise ArgumentError, "scope must be a Proc, #{val.class} given" if val && !val.is_a?(Proc)
-
+      validate_callable!(:scope, val)
       @scope = val
     end
 
     alias_method :query=, :scope=
 
     def predicate=(val)
-      raise ArgumentError, "predicate must be a Proc, #{val.class} given" if val && !val.is_a?(Proc)
-
+      validate_callable!(:predicate, val)
       @predicate = val
     end
 
-    def granted_by=(val)
-      raise ArgumentError, "granted_by must be a Proc, #{val.class} given" if val && !val.is_a?(Proc)
-
-      @granted_by = val
-    end
-
-    def granting_class=(val)
-      raise ArgumentError, "granting_class must be a Class, #{val.class} given" if val && !val.is_a?(Class)
-
-      @granting_class = val
-    end
-
     private
+
+    def validate_callable!(name, val)
+      raise ArgumentError, "#{name} must be a Proc, #{val.class} given" if val && !val.is_a?(Proc)
+    end
 
     def key_matches?(key)
       key == @key
