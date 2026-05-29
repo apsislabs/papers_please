@@ -88,6 +88,78 @@ RSpec.describe PapersPlease::Policy do
     end
   end
 
+  describe "#role" do
+    it "accepts an explicit role class and configures it" do
+      admin_role_class = Class.new(PapersPlease::Role) do
+        def configure
+          grant :read, Post, allow_all: true
+        end
+      end
+
+      policy_klass = Class.new(PapersPlease::Policy) do
+        define_method(:configure) do
+          role :admin, admin_role_class, proc { |u| u.admin }
+        end
+      end
+
+      expect(policy_klass.new(admin).can?(:read, Post)).to be true
+      expect(policy_klass.new(member).can?(:read, Post)).to be false
+    end
+
+    it "instantiates a fresh role object for each policy instance" do
+      configured_roles = []
+      member_role_class = Class.new(PapersPlease::Role) do
+        define_method(:configure) do
+          configured_roles << self
+          grant :read, Post, allow_all: true
+        end
+      end
+
+      policy_klass = Class.new(PapersPlease::Policy) do
+        define_method(:configure) do
+          role :member, member_role_class
+        end
+      end
+
+      first_policy = policy_klass.new(member)
+      second_policy = policy_klass.new(member)
+
+      expect(first_policy.roles[:member]).not_to equal(second_policy.roles[:member])
+      expect(configured_roles).to contain_exactly(first_policy.roles[:member], second_policy.roles[:member])
+    end
+
+    it "passes the user and policy to role instances" do
+      seen = {}
+      member_role_class = Class.new(PapersPlease::Role) do
+        define_method(:configure) do
+          seen[:user] = user
+          seen[:policy] = policy
+        end
+      end
+
+      policy_klass = Class.new(PapersPlease::Policy) do
+        define_method(:configure) do
+          role :member, member_role_class
+        end
+      end
+
+      policy = policy_klass.new(member)
+
+      expect(seen[:user]).to equal(member)
+      expect(seen[:policy]).to equal(policy)
+    end
+
+    it "requires explicit role classes to inherit from PapersPlease::Role" do
+      policy_klass = Class.new(PapersPlease::Policy) do
+        def configure
+          role :member, String
+        end
+      end
+
+      expect { policy_klass.new(member) }.to raise_error(ArgumentError, /inherit from PapersPlease::Role/)
+    end
+  end
+
   describe "#can" do
     it "returns true for passing predicate" do
       policy = sample_policy(member)

@@ -53,6 +53,48 @@ class AccessPolicy < PapersPlease::Policy
 end
 ```
 
+### Role Classes
+
+For larger policies, extract a role into a class. Register it explicitly with its policy name and, optionally, its applicability predicate:
+
+```ruby
+class AdminRole < PapersPlease::Role
+  def configure
+    grant %i[index new create], Post, collection: true, allow_all: true
+    grant %i[show edit update destroy], Post, allow_all: true
+  end
+end
+
+class AccessPolicy < PapersPlease::Policy
+  def configure
+    role :admin, AdminRole, proc { |u| u.admin? }
+    role :member
+
+    permit :member do |role|
+      role.grant :index, Post, collection: true, scope: proc { |u| u.posts }
+      role.grant %i[show edit update], Post, scope: proc { |u| u.posts }
+    end
+  end
+end
+```
+
+Role classes are instantiated for each policy instance; they are not singletons. A role class can use `user` and `policy` readers if configuration needs request-local context, though most policies should prefer predicates and scopes that receive the user at authorization time.
+
+```ruby
+class MemberRole < PapersPlease::Role
+  def configure
+    grant :index, Post, collection: true, scope: proc { |u| u.posts }
+    grant %i[show edit update], Post, scope: proc { |u| u.posts }
+  end
+end
+
+class AccessPolicy < PapersPlease::Policy
+  def configure
+    role :member, MemberRole, proc { |u| u.member? }
+  end
+end
+```
+
 ### Controller Usage
 
 ```ruby

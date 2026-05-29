@@ -2,12 +2,19 @@
 
 module PapersPlease
   class Role
-    attr_reader :name, :predicate, :permissions
+    attr_reader :name, :predicate, :permissions, :user, :policy
 
-    def initialize(name, predicate: nil)
+    def initialize(name, predicate: nil, user: nil, policy: nil)
       @name = name
       @predicate = predicate
+      @user = user
+      @policy = policy
       @permissions = []
+
+      configure
+    end
+
+    def configure
     end
 
     def applies_to?(user)

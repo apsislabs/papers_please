@@ -24,11 +24,12 @@ module PapersPlease
       raise NotImplementedError, "The #configure method of the access policy was not implemented"
     end
 
-    def add_role(name, predicate = nil)
+    def add_role(name, klass_or_predicate = nil, predicate = nil)
+      role_class, resolved_predicate = resolve_role_class_and_predicate(klass_or_predicate, predicate)
       name = name.to_sym
       raise DuplicateRole if roles.key?(name)
 
-      role = Role.new(name, predicate: predicate)
+      role = role_class.new(name, predicate: resolved_predicate, user: user, policy: self)
       roles[name] = role
 
       role
@@ -121,6 +122,18 @@ module PapersPlease
 
     def roles_to_check(roles: nil)
       roles.nil? ? applicable_roles : get_applicable_roles_by_keys(roles)
+    end
+
+    def resolve_role_class_and_predicate(klass_or_predicate, predicate)
+      if klass_or_predicate.is_a?(Class)
+        unless klass_or_predicate <= Role
+          raise ArgumentError, "role class must inherit from PapersPlease::Role"
+        end
+
+        [klass_or_predicate, predicate]
+      else
+        [Role, klass_or_predicate]
+      end
     end
 
     def subject_label(subject)
