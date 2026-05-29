@@ -7,10 +7,10 @@ module PapersPlease
     attr_reader :fallthrough, :user
 
     def initialize(user)
-      @user          = user
+      @user = user
       @default_scope = nil
-      @roles         = {}
-      @cache         = {}
+      @roles = {}
+      @cache = {}
 
       configure
     end
@@ -19,12 +19,12 @@ module PapersPlease
       @fallthrough = true
     end
 
-    def default_scope(scope)
+    def default_scope(scope) # standard:disable Style/TrivialAccessors
       @default_scope = scope
     end
 
     def configure
-      raise NotImplementedError, 'The #configure method of the access policy was not implemented'
+      raise NotImplementedError, "The #configure method of the access policy was not implemented"
     end
 
     # Add a role to the Policy
@@ -37,7 +37,7 @@ module PapersPlease
 
       role
     end
-    alias role add_role
+    alias_method :role, :add_role
 
     # Add permissions to the Role
     def add_permissions(keys)
@@ -49,7 +49,7 @@ module PapersPlease
         yield roles[key]
       end
     end
-    alias permit add_permissions
+    alias_method :permit, :add_permissions
 
     # Look up a stored permission block and call with
     # the current user and subject
@@ -101,14 +101,14 @@ module PapersPlease
         permission = role.find_permission(action, klass)
         scope = permission&.fetch(user, klass, action)
 
-        next if permission.nil? || (scope.nil? && fallthrough)
+        next if permission.nil? || (scope.nil? && fallthrough) # standard:disable Style/SafeNavigation
 
         return scope
       end
 
       @default_scope || nil
     end
-    alias query scope_for
+    alias_method :query, :scope_for
 
     # Fetch roles that apply to the current user
     def applicable_roles
@@ -127,7 +127,7 @@ module PapersPlease
       if fallthrough
         permission.nil? ? false : permission.granted?(user, subject, action)
       else
-        permission.nil? ? nil : permission.granted?(user, subject, action)
+        permission&.granted?(user, subject, action)
       end
     end
 

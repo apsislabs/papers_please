@@ -1,11 +1,11 @@
 # frozen_string_literal: true
 
-require 'rails/railtie'
+require "rails/railtie"
 
 module PapersPlease
   class Railtie < ::Rails::Railtie
     rake_tasks do
-      Dir[File.join(File.dirname(__FILE__), 'tasks', '*.rake')].each { |f| load f }
+      Dir[File.join(File.dirname(__FILE__), "tasks", "*.rake")].each { |f| load f }
     end
 
     initializer :papers_plesae do

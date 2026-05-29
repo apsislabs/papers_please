@@ -1,39 +1,39 @@
 # frozen_string_literal: true
 
-require 'spec_helper'
+require "spec_helper"
 
 RSpec.describe PapersPlease::Role do
   let(:admin_user) { User.new(posts: [], admin: true) }
   let(:manager_user) { User.new(posts: [], manager: true) }
   let(:member_user) { User.new(posts: [], member: true) }
 
-  describe '#applies_to?' do
-    context 'with no predicate' do
+  describe "#applies_to?" do
+    context "with no predicate" do
       let(:no_predicate_role) { described_class.new(:admin) }
 
-      it 'applies' do
+      it "applies" do
         expect(no_predicate_role.applies_to?(member_user)).to be true
       end
     end
 
-    context 'with predicate' do
-      let(:admin_role) { described_class.new(:admin, predicate: (proc { |user| user.admin? })) }
+    context "with predicate" do
+      let(:admin_role) { described_class.new(:admin, predicate: proc { |user| user.admin? }) }
 
-      it 'applies to admin' do
+      it "applies to admin" do
         expect(admin_role.applies_to?(admin_user)).to be true
       end
 
-      it 'does not apply to member' do
+      it "does not apply to member" do
         expect(admin_role.applies_to?(member_user)).to be false
       end
     end
   end
 
-  describe '#add_permission' do
-    context 'manage expansion' do
+  describe "#add_permission" do
+    context "manage expansion" do
       let(:role) { described_class.new(:admin) }
 
-      it 'adds correct permissions' do
+      it "adds correct permissions" do
         role.add_permission(:manage, Post)
         expect(role.permissions.size).to eq 4
 
@@ -42,28 +42,28 @@ RSpec.describe PapersPlease::Role do
       end
     end
 
-    context 'duplicate permissions' do
+    context "duplicate permissions" do
       let(:role) { described_class.new(:admin) }
 
-      it 'raises error for duplicates' do
+      it "raises error for duplicates" do
         role.add_permission(:read, Post)
         expect { role.add_permission(:read, Post) }.to raise_error(PapersPlease::DuplicatePermission)
       end
 
-      it 'raises error for duplicates in expansions' do
+      it "raises error for duplicates in expansions" do
         role.add_permission(:read, Post)
         expect { role.add_permission(:manage, Post) }.to raise_error(PapersPlease::DuplicatePermission)
       end
     end
 
-    context 'granted_by' do
-      let(:granted_by) { (proc { |_u, a| a.post }) }
+    context "granted_by" do
+      let(:granted_by) { proc { |_u, a| a.post } }
       let(:granting_class) { Post }
       let(:role) { described_class.new(:admin) }
 
-      it 'raises exceptions for invalid grants' do
+      it "raises exceptions for invalid grants" do
         expect do
-          role.add_permission(:read, Attachment, granted_by: 'invalid')
+          role.add_permission(:read, Attachment, granted_by: "invalid")
         end.to raise_error PapersPlease::InvalidGrant
         expect do
           role.add_permission(:read, Attachment, granted_by: granted_by)
@@ -74,13 +74,13 @@ RSpec.describe PapersPlease::Role do
         expect { role.add_permission(:read, Attachment, granted_by: []) }.to raise_error PapersPlease::InvalidGrant
         expect do
           role.add_permission(:read, Attachment,
-                              granted_by: [granted_by, granting_class])
+            granted_by: [granted_by, granting_class])
         end.to raise_error PapersPlease::InvalidGrant
 
         expect { role.add_permission(:read, Attachment, granted_by: [granting_class, granted_by]) }.not_to raise_error
       end
 
-      it 'adds a granted permission' do
+      it "adds a granted permission" do
         role.add_permission(:read, Attachment, granted_by: [granting_class, granted_by])
         expect(role.permissions.size).to eq 1
         permission = role.permissions.first
@@ -90,51 +90,51 @@ RSpec.describe PapersPlease::Role do
       end
     end
 
-    context 'query and predicate' do
-      let(:predicate) { (proc { |user| user.admin? }) }
-      let(:query) { (proc { [] }) }
+    context "query and predicate" do
+      let(:predicate) { proc { |user| user.admin? } }
+      let(:query) { proc { [] } }
       let(:role) { described_class.new(:admin) }
 
-      it 'has correct query' do
+      it "has correct query" do
         role.add_permission(:read, Post, query: query, predicate: predicate)
         expect(role.permissions.size).to eq 1
         expect(role.permissions.first.query).to be query
       end
 
-      it 'has correct predicate' do
+      it "has correct predicate" do
         role.add_permission(:read, Post, query: query, predicate: predicate)
         expect(role.permissions.size).to eq 1
         expect(role.permissions.first.predicate).to be predicate
       end
     end
 
-    context 'only query' do
+    context "only query" do
       let(:included_post) { Post.new }
       let(:excluded_post) { Post.new }
-      let(:query) { (proc { [included_post] }) }
+      let(:query) { proc { [included_post] } }
       let(:admin_role) { described_class.new(:admin) }
       let(:manager_role) { described_class.new(:manager) }
 
-      it 'has correct query' do
+      it "has correct query" do
         admin_role.add_permission(:read, Post, query: query)
         expect(admin_role.permissions.size).to eq 1
         expect(admin_role.permissions.first.query).to be query
         expect(admin_role.permissions.first.query.call).to contain_exactly(included_post)
       end
 
-      it 'generates predicate that allows posts in scope' do
+      it "generates predicate that allows posts in scope" do
         admin_role.add_permission(:read, Post, query: query)
         expect(admin_role.permissions.size).to eq 1
         expect(admin_role.permissions.first.predicate.call(admin_user, included_post)).to be true
       end
 
-      it 'generates predicate that disallows posts not in scope' do
+      it "generates predicate that disallows posts not in scope" do
         admin_role.add_permission(:read, Post, query: query)
         expect(admin_role.permissions.size).to eq 1
         expect(admin_role.permissions.first.predicate.call(admin_user, excluded_post)).to be false
       end
 
-      it 'generates predicate that disallows global access' do
+      it "generates predicate that disallows global access" do
         admin_role.add_permission(:read, Post, query: query)
         expect(admin_role.permissions.size).to eq 1
         expect(admin_role.permissions.first.predicate.call(admin_user, Post)).to be false
@@ -147,28 +147,28 @@ RSpec.describe PapersPlease::Role do
       # end
     end
 
-    context 'only predicate' do
-      let(:predicate) { (proc { |user| user.admin? }) }
+    context "only predicate" do
+      let(:predicate) { proc { |user| user.admin? } }
       let(:predicate_role) { described_class.new(:admin) }
 
-      it 'has nil query' do
+      it "has nil query" do
         predicate_role.add_permission(:read, Post, predicate: predicate)
         expect(predicate_role.permissions.size).to eq 1
         expect(predicate_role.permissions.first.query).to be_nil
       end
 
-      it 'has correct predicate' do
+      it "has correct predicate" do
         predicate_role.add_permission(:read, Post, predicate: predicate)
         expect(predicate_role.permissions.size).to eq 1
         expect(predicate_role.permissions.first.predicate).to be predicate
       end
     end
 
-    context 'neither query nor predicate' do
+    context "neither query nor predicate" do
       let(:empty_role) { described_class.new(:admin) }
-      let(:klass) { spy('klass') }
+      let(:klass) { spy("klass") }
 
-      it 'creates an all query' do
+      it "creates an all query" do
         empty_role.add_permission(:read, klass)
         expect(empty_role.permissions.size).to eq 1
 
@@ -176,7 +176,7 @@ RSpec.describe PapersPlease::Role do
         expect(klass).to have_received(:all)
       end
 
-      it 'creates a true predicate' do
+      it "creates a true predicate" do
         empty_role.add_permission(:read, klass)
         expect(empty_role.permissions.first.predicate.call).to be true
       end

@@ -10,7 +10,7 @@ class User
     @member = member
   end
 
-  alias admin? admin
-  alias manager? manager
-  alias member? member
+  alias_method :admin?, :admin
+  alias_method :manager?, :manager
+  alias_method :member?, :member
 end

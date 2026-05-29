@@ -20,7 +20,7 @@ module PapersPlease
 
         if !granted_by.nil? && !valid_grant?(granted_by)
           raise InvalidGrant,
-                'granted_by must be an array of [Class, Proc]'
+            "granted_by must be an array of [Class, Proc]"
         end
 
         permissions << make_permission(
@@ -33,7 +33,7 @@ module PapersPlease
         )
       end
     end
-    alias grant add_permission
+    alias_method :grant, :add_permission
 
     def find_permission(action, subject)
       permissions.detect do |permission|
@@ -59,7 +59,7 @@ module PapersPlease
     # Wrap actions, translating :manage into :crud
     def prepare_actions(action)
       Array(action).flat_map do |a|
-        a == :manage ? %i[create read update destroy] : [a]
+        (a == :manage) ? %i[create read update destroy] : [a]
       end
     end
 
@@ -105,7 +105,7 @@ module PapersPlease
     def build_predicate_from_query(action, actions, klass, query)
       # If the action is :create, expanded from :manage
       # then we set the default all predicate
-      return (proc { true }) if action == :create && actions == :manage
+      return proc { true } if action == :create && actions == :manage
 
       # Otherwise the default predicate is to check
       # for inclusion in the returned relationship

@@ -1,18 +1,18 @@
 # frozen_string_literal: true
 
 RSpec.describe PapersPlease do
-  it 'has a version number' do
+  it "has a version number" do
     expect(PapersPlease::VERSION).not_to be_nil
   end
 
-  context 'permissions table' do
-    it 'returns a string and does not error' do
+  context "permissions table" do
+    it "returns a string and does not error" do
       res = described_class.permissions_table(AccessPolicy)
       expect(res).to be_a String
     end
   end
 
-  context 'access policy' do
+  context "access policy" do
     let(:posts) { Array.new(5) { Post.new } }
     let(:post) { posts.first }
     let(:attachment) { Attachment.new(post: post) }
@@ -24,11 +24,11 @@ RSpec.describe PapersPlease do
     let(:manager) { User.new(posts: posts.slice(0, 3), manager: true) }
     let(:admin) { User.new(posts: posts, admin: true) }
 
-    context 'admin' do
+    context "admin" do
       before { @policy = AccessPolicy.new(admin) }
 
-      describe '#can?' do
-        it 'grants permissions' do
+      describe "#can?" do
+        it "grants permissions" do
           # Posts
           expect(@policy.can?(:create, Post)).to be true
           expect(@policy.can?(:read, post)).to be true
@@ -41,31 +41,31 @@ RSpec.describe PapersPlease do
         end
       end
 
-      describe '#scope_for' do
-        it 'creates scope correctly' do
+      describe "#scope_for" do
+        it "creates scope correctly" do
           expect(@policy.scope_for(:read, Post)).to contain_exactly(*Post.all)
         end
       end
 
-      describe '#authorize!' do
-        it 'raises exception if not allowed' do
+      describe "#authorize!" do
+        it "raises exception if not allowed" do
           expect { @policy.authorize! :not_real, Post }.to(raise_exception { PapersPlease::AccessDenied })
           expect { @policy.authorize! :not_real, post }.to(raise_exception { PapersPlease::AccessDenied })
         end
 
-        it 'does nothing if allowed' do
+        it "does nothing if allowed" do
           expect { @policy.authorize! :create, Post }.not_to raise_exception
           expect { @policy.authorize! :read, post }.not_to raise_exception
         end
       end
     end
 
-    context 'manager' do
+    context "manager" do
       before { @policy = AccessPolicy.new(manager) }
 
-      describe '#can?' do
-        describe '#can?' do
-          it 'grants permissions' do
+      describe "#can?" do
+        describe "#can?" do
+          it "grants permissions" do
             # Post
             expect(@policy.can?(:create, Post)).to be true
             expect(@policy.can?(:read, post)).to be true
@@ -94,32 +94,32 @@ RSpec.describe PapersPlease do
         end
       end
 
-      describe '#scope_for' do
-        it 'creates scope correctly' do
+      describe "#scope_for" do
+        it "creates scope correctly" do
           expect(@policy.scope_for(:read, Post)).to contain_exactly(*manager.posts)
           expect(@policy.scope_for(:update, Post)).to contain_exactly(*manager.posts)
           expect(@policy.scope_for(:destroy, Post)).to contain_exactly(*manager.posts)
         end
       end
 
-      describe '#authorize!' do
-        it 'raises exception if not allowed' do
+      describe "#authorize!" do
+        it "raises exception if not allowed" do
           expect { @policy.authorize! :read, restricted_post }.to(raise_exception { PapersPlease::AccessDenied })
           expect { @policy.authorize! :destroy, restricted_post }.to(raise_exception { PapersPlease::AccessDenied })
         end
 
-        it 'does nothing if allowed' do
+        it "does nothing if allowed" do
           expect { @policy.authorize! :create, Post }.not_to raise_exception
           expect { @policy.authorize! :read, post }.not_to raise_exception
         end
       end
     end
 
-    context 'member' do
+    context "member" do
       before { @policy = AccessPolicy.new(member) }
 
-      describe '#can?' do
-        it 'grants permissions correctly' do
+      describe "#can?" do
+        it "grants permissions correctly" do
           # Posts
           expect(@policy.can?(:create, Post)).to be true
           expect(@policy.can?(:read, post)).to be true
@@ -145,19 +145,19 @@ RSpec.describe PapersPlease do
         end
       end
 
-      describe '#scope_for' do
-        it 'creates scope correctly' do
+      describe "#scope_for" do
+        it "creates scope correctly" do
           expect(@policy.scope_for(:read, Post)).to contain_exactly(*member.posts)
         end
       end
 
-      describe '#authorize!' do
-        it 'raises exception if not allowed' do
+      describe "#authorize!" do
+        it "raises exception if not allowed" do
           expect { @policy.authorize! :destroy, Post }.to(raise_exception { PapersPlease::AccessDenied })
           expect { @policy.authorize! :destroy, post }.to(raise_exception { PapersPlease::AccessDenied })
         end
 
-        it 'does nothing if allowed' do
+        it "does nothing if allowed" do
           expect { @policy.authorize! :create, Post }.not_to raise_exception
           expect { @policy.authorize! :read, post }.not_to raise_exception
         end
