@@ -26,10 +26,12 @@ Gem::Specification.new do |spec|
 
   spec.add_dependency "terminal-table"
 
-  spec.add_development_dependency "bundler", "~> 2.0"
+  spec.add_development_dependency "bundler", ">= 2.4.0"
   spec.add_development_dependency "byebug"
   spec.add_development_dependency "rake", "~> 13.0"
-  spec.add_development_dependency "rspec", "~> 3.12"
+  spec.add_development_dependency "rspec", "~> 3.13"
   spec.add_development_dependency "standard", "~> 1.39"
   spec.add_development_dependency "simplecov"
+
+  spec.metadata["rubygems_mfa_required"] = "true"
 end
