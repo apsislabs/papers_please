@@ -53,13 +53,7 @@ module PapersPlease
         permission = role&.find_permission(action, check_subject)
         next if permission.nil?
 
-        resolved_subject = check_subject
-        if permission.delegated?
-          resolved_subject, permission = resolve_delegation(permission, check_subject, role)
-          next if permission.nil?
-        end
-
-        granted = !!permission.granted?(user, resolved_subject)
+        granted = permission_granted_for_role?(role, permission, check_subject)
         next if !granted && fallthrough
 
         return granted
@@ -87,7 +81,7 @@ module PapersPlease
         role.permissions.each do |permission|
           next unless permission.matches_subject?(subject)
           next if actions.include?(permission.key)
-          next unless permission.granted?(user, subject)
+          next unless permission_granted_for_role?(role, permission, subject)
 
           actions << permission.key
         end
@@ -97,7 +91,7 @@ module PapersPlease
     def roles_that_can(action, subject)
       applicable_roles.filter do |_, role|
         permission = role.find_permission(action, subject)
-        permission&.granted?(user, subject) || false
+        permission && permission_granted_for_role?(role, permission, subject)
       end.keys
     end
 
@@ -139,9 +133,23 @@ module PapersPlease
       end
     end
 
+    def permission_granted_for_role?(role, permission, subject)
+      resolved_subject = subject
+
+      if permission.delegated?
+        resolved_subject, permission = resolve_delegation(permission, subject, role)
+        return false if permission.nil?
+      end
+
+      !!permission.granted?(user, resolved_subject)
+    end
+
     def resolve_delegation(permission, subject, role)
       delegation = permission.delegation
       resolved = subject.is_a?(Class) ? delegation.klass : delegation.resolve(user, subject)
+      # Delegation is intentionally same-role only: a delegated grant is an
+      # indirection to another permission on the role that declared it, not a
+      # search across every applicable role.
       permission = role.find_permission(permission.key, resolved)
 
       [resolved, permission]

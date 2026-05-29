@@ -10,6 +10,25 @@ require "papers_please/rails/controller_methods"
 require "papers_please/railtie" if defined? Rails
 
 module PapersPlease
+  class << self
+    attr_writer :policy_class
+
+    def policy_class
+      @policy_class ||= Object.const_get(policy_class_name)
+    rescue NameError
+      raise Error, "PapersPlease.policy_class is not configured and #{policy_class_name} is not defined"
+    end
+
+    def policy_class_name
+      @policy_class_name ||= "AccessPolicy"
+    end
+
+    def policy_class_name=(value)
+      @policy_class = nil
+      @policy_class_name = value
+    end
+  end
+
   # rubocop:disable Metrics/PerceivedComplexity, Metrics/MethodLength
   def self.permissions_table(policy_klass)
     require "terminal-table"

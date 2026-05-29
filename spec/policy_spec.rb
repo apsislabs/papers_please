@@ -149,6 +149,53 @@ RSpec.describe PapersPlease::Policy do
     end
   end
 
+  describe "delegated permissions" do
+    let(:attachment) { Attachment.new(post: post) }
+
+    it "resolves delegated permissions through parent permissions on the same role" do
+      policy_klass = Class.new(PapersPlease::Policy) do
+        def configure
+          role :member
+
+          permit :member do |role|
+            role.grant :read, Post, if: proc { true }
+            role.grant :read, Attachment, through: [Post, proc { |_u, attachment| attachment.post }]
+          end
+        end
+      end
+
+      policy = policy_klass.new(member)
+
+      expect(policy.can?(:read, attachment)).to be true
+      expect(policy.permitted_actions(attachment)).to contain_exactly(:read)
+      expect(policy.roles_that_can(:read, attachment)).to contain_exactly(:member)
+    end
+
+    it "does not resolve delegated permissions through a different applicable role" do
+      policy_klass = Class.new(PapersPlease::Policy) do
+        def configure
+          allow_fallthrough
+          role :attachment_reader
+          role :post_reader
+
+          permit :attachment_reader do |role|
+            role.grant :read, Attachment, through: [Post, proc { |_u, attachment| attachment.post }]
+          end
+
+          permit :post_reader do |role|
+            role.grant :read, Post, if: proc { true }
+          end
+        end
+      end
+
+      policy = policy_klass.new(member)
+
+      expect(policy.can?(:read, attachment)).to be false
+      expect(policy.permitted_actions(attachment)).to be_empty
+      expect(policy.roles_that_can(:read, attachment)).to be_empty
+    end
+  end
+
   describe "#role_that_can" do
     it "returns the symbolic name of the roles that can perform an action" do
       policy_klass = Class.new(PapersPlease::Policy) do

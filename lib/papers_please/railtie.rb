@@ -8,18 +8,9 @@ module PapersPlease
       Dir[File.join(File.dirname(__FILE__), "tasks", "*.rake")].each { |f| load f }
     end
 
-    initializer :papers_plesae do
-      if defined? ActionController::Base
-        ActionController::Base.class_eval do
-          include PapersPlease::Rails::ControllerMethods
-        end
-      end
-
-      if defined? ActionController::API
-        ActionController::API.class_eval do
-          include PapersPlease::Rails::ControllerMethods
-        end
-      end
+    initializer :papers_please do
+      PapersPlease::Rails.install_controller_methods(ActionController::Base) if defined? ActionController::Base
+      PapersPlease::Rails.install_controller_methods(ActionController::API) if defined? ActionController::API
     end
   end
 end

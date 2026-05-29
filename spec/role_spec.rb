@@ -73,13 +73,15 @@ RSpec.describe PapersPlease::Role do
         expect { role.add_permission(:read, Attachment, granted_by: [granting_class, resolver]) }.not_to raise_error
       end
 
-      it "adds a delegated permission" do
+      it "adds a delegated permission without synthesizing standalone allow-all checks" do
         role.add_permission(:read, Attachment, granted_by: [granting_class, resolver])
         expect(role.permissions.size).to eq 1
         permission = role.permissions.first
         expect(permission.delegated?).to be true
         expect(permission.delegation.resolver).to eq resolver
         expect(permission.granting_class).to eq granting_class
+        expect(permission.query).to be_nil
+        expect(permission.predicate).to be_nil
       end
     end
 
@@ -158,6 +160,13 @@ RSpec.describe PapersPlease::Role do
         admin_role.add_permission(:read, Post, query: proc { relation })
 
         expect(admin_role.permissions.first.predicate.call(admin_user, included_post)).to be true
+      end
+
+      it "supports Set scopes" do
+        admin_role.add_permission(:read, Post, query: proc { Set[included_post] })
+
+        expect(admin_role.permissions.first.predicate.call(admin_user, included_post)).to be true
+        expect(admin_role.permissions.first.predicate.call(admin_user, excluded_post)).to be false
       end
     end
 

@@ -170,6 +170,39 @@ role.grant :show, Attachment, through: [Post, proc { |_u, attachment| attachment
 
 This means: "to check if a user can `:show` an `Attachment`, find its `Post` and check whether the user can `:show` that `Post` instead."
 
+Delegation resolves within the role that declared it. If `:member` delegates `Attachment` access through `Post`, the `:member` role must also define the matching `Post` permission; `papers_please` will not search other applicable roles for that parent permission.
+
+## Explicit Unconditional Grants
+
+A grant with no `scope:`, `if:`, or `through:` is an unconditional allow. Make that intent explicit with `allow_all: true`:
+
+```ruby
+role.grant :create, Post, collection: true, allow_all: true
+role.grant %i[index show], Post, allow_all: true
+```
+
+Omitting `allow_all: true` still works for compatibility, but emits a warning.
+
+## Scope Predicate Behavior
+
+When an instance-level grant has a `scope:` but no `if:`, `papers_please` generates a predicate from the scope. The generated predicate supports `Array`, `Set`, and ActiveRecord-like objects that respond to `exists?`. It intentionally does not trust arbitrary objects that merely define `include?`.
+
+For hot paths or complex data sources, prefer an explicit `if:` predicate. Policy instances are intended to be created per user/request; do not reuse one policy object across users or after mutating a user's roles.
+
+## Rails Integration
+
+Rails controllers get `can?`, `cannot?`, and `authorize!` methods. Views get `can?` and `cannot?` helpers.
+
+By default, Rails integration looks for `AccessPolicy`. You can configure a different policy class:
+
+```ruby
+PapersPlease.policy_class = MyPolicy
+# or
+PapersPlease.policy_class_name = "MyPolicy"
+```
+
+Do not pass request parameters to the advanced `roles:` option of `can?`; it is intended for trusted internal checks only.
+
 ## A Helpful CLI
 
 ```bash
