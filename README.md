@@ -203,13 +203,34 @@ PapersPlease.policy_class_name = "MyPolicy"
 
 Do not pass request parameters to the advanced `roles:` option of `can?`; it is intended for trusted internal checks only.
 
-## A Helpful CLI
+## Rake Tasks
+
+`papers_please` ships with a Rails rake task for inspecting policy configuration:
 
 ```bash
 $ rails papers_please:roles
 ```
 
-Prints a table of all roles, subjects, and permissions in your policy.
+The task loads the Rails environment, instantiates the configured policy class, and prints a `terminal-table` report of every role and permission in match order. By default it uses `PapersPlease.policy_class`, which resolves to `AccessPolicy` unless you configure a different policy class.
+
+To inspect a specific policy class, pass its constant name as the task argument:
+
+```bash
+$ rails 'papers_please:roles[AdminPolicy]'
+```
+
+The table includes:
+
+| Column | Meaning |
+|---|---|
+| `role` | Role name, shown once per grouped role section |
+| `subject` | Resource class or subject the permission applies to |
+| `permission` | Action key granted by the role |
+| `has query?` | Whether the grant has a `scope:`/legacy `query:` |
+| `has predicate?` | Whether the grant has an `if:`/legacy `predicate:` |
+| `granted by other?` | Whether the grant delegates through another subject via `through:`/legacy `granted_by:` |
+
+This is useful when reviewing role order, finding unconditional grants, or confirming that delegated and scoped permissions were registered as expected.
 
 ## Installation
 
