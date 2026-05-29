@@ -101,6 +101,9 @@ policy.authorize!(:edit, @post) # => raises PapersPlease::AccessDenied
 
 # What records can this user access for this action?
 policy.scope_for(:index, Post)  # => ActiveRecord::Relation
+
+# What actions can this user perform on this record?
+policy.permitted_actions(@post) # => [:show, :edit, :update]
 ```
 
 ## Collection vs Instance Permissions

@@ -85,6 +85,18 @@ module PapersPlease
       applicable_roles.slice(*Array(keys))
     end
 
+    def permitted_actions(subject)
+      applicable_roles.each_with_object(Set.new) do |(_, role), actions|
+        role.permissions.each do |permission|
+          next unless permission.matches?(permission.key, subject)
+          next if actions.include?(permission.key)
+          next unless permission.granted?(user, subject, permission.key)
+
+          actions << permission.key
+        end
+      end.to_a
+    end
+
     def roles_that_can(action, subject)
       applicable_roles.filter do |_, role|
         permission = role.find_permission(action, subject)

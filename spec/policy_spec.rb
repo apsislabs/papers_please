@@ -175,6 +175,40 @@ RSpec.describe PapersPlease::Policy do
     end
   end
 
+  describe "#permitted_actions" do
+    it "returns actions the user can perform on an instance" do
+      policy_klass = Class.new(PapersPlease::Policy) do
+        def configure
+          role :member
+
+          permit :member do |role|
+            role.grant :read, Post, if: proc { true }
+            role.grant :update, Post, if: proc { true }
+            role.grant :destroy, Post, if: proc { false }
+          end
+        end
+      end
+
+      policy = policy_klass.new(member)
+      expect(policy.permitted_actions(post)).to contain_exactly(:read, :update)
+    end
+
+    it "returns actions across multiple roles with fallthrough" do
+      policy = sample_fallthrough_policy(admin)
+      published_post = Post.new
+      published_post.published = true
+      admin.posts << published_post
+
+      actions = policy.permitted_actions(published_post)
+      expect(actions).to contain_exactly(:read)
+    end
+
+    it "returns empty array when no actions are permitted" do
+      policy = sample_policy(member)
+      expect(policy.permitted_actions(other_post)).to be_empty
+    end
+  end
+
   describe "#authorize!" do
     it "raises an AccessDenied error for failing predicate" do
       policy = sample_policy(member)
