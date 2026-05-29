@@ -8,32 +8,32 @@ RSpec.describe PapersPlease::Policy do
   let(:member) { User.new(posts: posts.slice(0, 3), admin: false, member: true) }
   let(:admin) { User.new(posts: posts, admin: true, member: false) }
 
-  describe '#configure' do
+  describe "#configure" do
     let(:post) { Post.new }
     let(:owner_member) { User.new(posts: [post], member: true) }
     let(:other_member) { User.new(posts: [], member: true) }
 
-    it 'raises not implemented if not overriden' do
+    it "raises not implemented if not overriden" do
       klass = Class.new(described_class)
       expect { klass.new(member) }.to raise_error(NotImplementedError)
     end
 
-    context 'predicate check' do
+    context "predicate check" do
       before do
         allow(owner_member).to receive(:spy_method)
         allow(post).to receive(:spy_method)
       end
 
-      it 'passes user and object to permission check' do
+      it "passes user and object to permission check" do
         klass = Class.new(PapersPlease::Policy) do
           def configure
             role :member
 
             permit :member do |role|
-              role.grant :read, Post, predicate: (proc { |u, p|
-                                                    u.spy_method
-                                                    p.spy_method
-                                                  })
+              role.grant :read, Post, predicate: proc { |u, p|
+                u.spy_method
+                p.spy_method
+              }
             end
           end
         end
@@ -44,22 +44,22 @@ RSpec.describe PapersPlease::Policy do
       end
     end
 
-    context 'query' do
+    context "query" do
       before do
         allow(owner_member).to receive(:spy_method)
         allow(Post).to receive(:spy_method)
       end
 
-      it 'passes user and class to scope' do
+      it "passes user and class to scope" do
         klass = Class.new(PapersPlease::Policy) do
           def configure
             role :member
 
             permit :member do |role|
-              role.grant :read, Post, query: (proc { |u, p|
-                                                u.spy_method
-                                                p.spy_method
-                                              })
+              role.grant :read, Post, query: proc { |u, p|
+                u.spy_method
+                p.spy_method
+              }
             end
           end
         end
@@ -69,14 +69,14 @@ RSpec.describe PapersPlease::Policy do
         expect(Post).to have_received(:spy_method)
       end
 
-      it 'allows you to define a default scope when no role matches the query' do
+      it "allows you to define a default scope when no role matches the query" do
         klass = Class.new(PapersPlease::Policy) do
           def configure
-            role :admin, (proc { |u| u.admin })
+            role :admin, proc { |u| u.admin }
             role :member
 
             permit :admin do |role|
-              role.grant :read, Post, query: (proc { Post.all })
+              role.grant :read, Post, query: proc { Post.all }
             end
 
             default_scope :default_scope
@@ -88,19 +88,91 @@ RSpec.describe PapersPlease::Policy do
     end
   end
 
-  describe '#can' do
-    it 'returns true for passing predicate' do
+  describe "#role" do
+    it "accepts an explicit role class and configures it" do
+      admin_role_class = Class.new(PapersPlease::Role) do
+        def configure
+          grant :read, Post, allow_all: true
+        end
+      end
+
+      policy_klass = Class.new(PapersPlease::Policy) do
+        define_method(:configure) do
+          role :admin, admin_role_class, proc { |u| u.admin }
+        end
+      end
+
+      expect(policy_klass.new(admin).can?(:read, Post)).to be true
+      expect(policy_klass.new(member).can?(:read, Post)).to be false
+    end
+
+    it "instantiates a fresh role object for each policy instance" do
+      configured_roles = []
+      member_role_class = Class.new(PapersPlease::Role) do
+        define_method(:configure) do
+          configured_roles << self
+          grant :read, Post, allow_all: true
+        end
+      end
+
+      policy_klass = Class.new(PapersPlease::Policy) do
+        define_method(:configure) do
+          role :member, member_role_class
+        end
+      end
+
+      first_policy = policy_klass.new(member)
+      second_policy = policy_klass.new(member)
+
+      expect(first_policy.roles[:member]).not_to equal(second_policy.roles[:member])
+      expect(configured_roles).to contain_exactly(first_policy.roles[:member], second_policy.roles[:member])
+    end
+
+    it "passes the user and policy to role instances" do
+      seen = {}
+      member_role_class = Class.new(PapersPlease::Role) do
+        define_method(:configure) do
+          seen[:user] = user
+          seen[:policy] = policy
+        end
+      end
+
+      policy_klass = Class.new(PapersPlease::Policy) do
+        define_method(:configure) do
+          role :member, member_role_class
+        end
+      end
+
+      policy = policy_klass.new(member)
+
+      expect(seen[:user]).to equal(member)
+      expect(seen[:policy]).to equal(policy)
+    end
+
+    it "requires explicit role classes to inherit from PapersPlease::Role" do
+      policy_klass = Class.new(PapersPlease::Policy) do
+        def configure
+          role :member, String
+        end
+      end
+
+      expect { policy_klass.new(member) }.to raise_error(ArgumentError, /inherit from PapersPlease::Role/)
+    end
+  end
+
+  describe "#can" do
+    it "returns true for passing predicate" do
       policy = sample_policy(member)
       expect(policy.can?(:read, post)).to be true
     end
 
-    it 'return false for failing predicate' do
+    it "return false for failing predicate" do
       policy = sample_policy(member)
       expect(policy.can?(:read, posts.last)).to be false
     end
 
-    context 'with fallthrough' do
-      it 'returns true when any applicable role has a passing predicate' do
+    context "with fallthrough" do
+      it "returns true when any applicable role has a passing predicate" do
         # Only members can read this new post because it is published, but
         # does not belong to the admin
         new_post = Post.new
@@ -118,7 +190,7 @@ RSpec.describe PapersPlease::Policy do
         expect(member_policy.can?(:read, posts.last)).to be false
       end
 
-      it 'returns false if no roles have a passing predicate' do
+      it "returns false if no roles have a passing predicate" do
         # No one can read this post because it does not belong to the admin
         # and it is not published
         new_post = Post.new
@@ -132,8 +204,8 @@ RSpec.describe PapersPlease::Policy do
       end
     end
 
-    context 'with specific role check' do
-      it 'allows you to specify a role to check against' do
+    context "with specific role check" do
+      it "allows you to specify a role to check against" do
         # Only members can read this new post because it is published, but
         # does not belong to the admin
         new_post = Post.new
@@ -149,21 +221,68 @@ RSpec.describe PapersPlease::Policy do
     end
   end
 
-  describe '#role_that_can' do
-    it 'returns the symbolic name of the roles that can perform an action' do
+  describe "delegated permissions" do
+    let(:attachment) { Attachment.new(post: post) }
+
+    it "resolves delegated permissions through parent permissions on the same role" do
+      policy_klass = Class.new(PapersPlease::Policy) do
+        def configure
+          role :member
+
+          permit :member do |role|
+            role.grant :read, Post, if: proc { true }
+            role.grant :read, Attachment, through: [Post, proc { |_u, attachment| attachment.post }]
+          end
+        end
+      end
+
+      policy = policy_klass.new(member)
+
+      expect(policy.can?(:read, attachment)).to be true
+      expect(policy.permitted_actions(attachment)).to contain_exactly(:read)
+      expect(policy.roles_that_can(:read, attachment)).to contain_exactly(:member)
+    end
+
+    it "does not resolve delegated permissions through a different applicable role" do
+      policy_klass = Class.new(PapersPlease::Policy) do
+        def configure
+          allow_fallthrough
+          role :attachment_reader
+          role :post_reader
+
+          permit :attachment_reader do |role|
+            role.grant :read, Attachment, through: [Post, proc { |_u, attachment| attachment.post }]
+          end
+
+          permit :post_reader do |role|
+            role.grant :read, Post, if: proc { true }
+          end
+        end
+      end
+
+      policy = policy_klass.new(member)
+
+      expect(policy.can?(:read, attachment)).to be false
+      expect(policy.permitted_actions(attachment)).to be_empty
+      expect(policy.roles_that_can(:read, attachment)).to be_empty
+    end
+  end
+
+  describe "#role_that_can" do
+    it "returns the symbolic name of the roles that can perform an action" do
       policy_klass = Class.new(PapersPlease::Policy) do
         def configure
           role :member
           role :admin
 
           permit :admin do |role|
-            role.grant :admin, Post
-            role.grant :foo, Post
+            role.grant :admin, Post, allow_all: true
+            role.grant :foo, Post, allow_all: true
           end
 
           permit :member do |role|
-            role.grant :read, Post
-            role.grant :foo, Post
+            role.grant :read, Post, allow_all: true
+            role.grant :foo, Post, allow_all: true
           end
         end
       end
@@ -175,10 +294,61 @@ RSpec.describe PapersPlease::Policy do
     end
   end
 
-  describe '#authorize!' do
-    it 'raises an AccessDenied error for failing predicate' do
+  describe "#permitted_actions" do
+    it "returns actions the user can perform on an instance" do
+      policy_klass = Class.new(PapersPlease::Policy) do
+        def configure
+          role :member
+
+          permit :member do |role|
+            role.grant :read, Post, if: proc { true }
+            role.grant :update, Post, if: proc { true }
+            role.grant :destroy, Post, if: proc { false }
+          end
+        end
+      end
+
+      policy = policy_klass.new(member)
+      expect(policy.permitted_actions(post)).to contain_exactly(:read, :update)
+    end
+
+    it "returns actions across multiple roles with fallthrough" do
+      policy = sample_fallthrough_policy(admin)
+      published_post = Post.new
+      published_post.published = true
+      admin.posts << published_post
+
+      actions = policy.permitted_actions(published_post)
+      expect(actions).to contain_exactly(:read)
+    end
+
+    it "returns empty array when no actions are permitted" do
+      policy = sample_policy(member)
+      expect(policy.permitted_actions(other_post)).to be_empty
+    end
+  end
+
+  describe "#authorize!" do
+    it "raises an AccessDenied error for failing predicate" do
       policy = sample_policy(member)
       expect { policy.authorize! :read, posts.last }.to raise_error(PapersPlease::AccessDenied)
+    end
+
+    it "does not call subject.to_s when building denial messages" do
+      policy_klass = Class.new(PapersPlease::Policy) do
+        def configure
+          role :member
+        end
+      end
+      evil = Class.new do
+        def to_s
+          raise "to_s should not be called"
+        end
+      end.new
+
+      expect do
+        policy_klass.new(member).authorize!(:read, evil)
+      end.to raise_error(PapersPlease::AccessDenied, /Access denied for :read on/)
     end
   end
 
@@ -187,15 +357,15 @@ RSpec.describe PapersPlease::Policy do
   def sample_policy_klass
     Class.new(PapersPlease::Policy) do
       def configure
-        role :admin, (proc { |u| u.admin })
-        role :member, (proc { |u| u.member })
+        role :admin, proc { |u| u.admin }
+        role :member, proc { |u| u.member }
 
         permit :admin do |role|
-          role.grant :read, Post
+          role.grant :read, Post, allow_all: true
         end
 
         permit :member do |role|
-          role.grant :read, Post, predicate: (proc { |u, p| u.posts.include? p })
+          role.grant :read, Post, predicate: proc { |u, p| u.posts.include? p }
         end
       end
     end
@@ -206,15 +376,15 @@ RSpec.describe PapersPlease::Policy do
       def configure
         allow_fallthrough
 
-        role :member, (proc { |u| u.admin || u.member })
-        role :admin, (proc { |u| u.admin })
+        role :member, proc { |u| u.admin || u.member }
+        role :admin, proc { |u| u.admin }
 
         permit :admin do |role|
-          role.grant :read, Post, predicate: (proc { |u, p| u.posts.include?(p) })
+          role.grant :read, Post, predicate: proc { |u, p| u.posts.include?(p) }
         end
 
         permit :member do |role|
-          role.grant :read, Post, predicate: (proc { |_u, p| p.published })
+          role.grant :read, Post, predicate: proc { |_u, p| p.published }
         end
       end
     end

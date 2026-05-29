@@ -1,39 +1,50 @@
+# frozen_string_literal: true
+
 module PapersPlease
   class Role
-    attr_reader :name, :predicate, :permissions
+    attr_reader :name, :predicate, :permissions, :user, :policy
 
-    def initialize(name, predicate: nil)
+    def initialize(name, predicate: nil, user: nil, policy: nil)
       @name = name
       @predicate = predicate
+      @user = user
+      @policy = policy
       @permissions = []
+
+      configure
+    end
+
+    def configure
     end
 
     def applies_to?(user)
-      return @predicate.call(user) if @predicate.is_a? Proc
+      return @predicate.call(user) if @predicate.is_a?(Proc)
 
       true
     end
 
-    def add_permission(actions, klass, query: nil, predicate: nil, granted_by: nil)
-      prepare_actions(actions).each do |action|
+    def add_permission(actions, klass, **opts)
+      scope, predicate, through, collection, allow_all = resolve_opts(opts)
+
+      Array(actions).each do |action|
         raise DuplicatePermission if permission_exists?(action, klass)
 
-        if !granted_by.nil? && !valid_grant?(granted_by)
-          raise InvalidGrant,
-                'granted_by must be an array of [Class, Proc]'
-        end
+        implicit_allow_all = scope.nil? && predicate.nil? && through.nil?
+        warn_unconditional_grant(action, klass) if implicit_allow_all && !allow_all
+
+        delegation = build_delegation(through)
 
         permissions << make_permission(
-          action,
-          actions,
-          klass,
-          query: query,
+          action, klass,
+          scope: scope,
           predicate: predicate,
-          granted_by: granted_by
+          delegation: delegation,
+          collection: collection,
+          allow_all: allow_all || implicit_allow_all
         )
       end
     end
-    alias grant add_permission
+    alias_method :grant, :add_permission
 
     def find_permission(action, subject)
       permissions.detect do |permission|
@@ -47,71 +58,88 @@ module PapersPlease
 
     private
 
-    def valid_grant?(tuple)
-      return false unless tuple.is_a? Array
-      return false unless tuple.length == 2
-      return false unless tuple[0].is_a? Class
-      return false unless tuple[1].is_a? Proc
+    def resolve_opts(opts)
+      scope = resolve_alias(opts, :scope, :query)
+      predicate = resolve_alias(opts, :if, :predicate)
+      through = resolve_alias(opts, :through, :granted_by)
+      collection = opts.fetch(:collection, false)
+      allow_all = opts.fetch(:allow_all, false)
 
-      true
+      [scope, predicate, through, collection, allow_all]
     end
 
-    # Wrap actions, translating :manage into :crud
-    def prepare_actions(action)
-      Array(action).flat_map do |a|
-        a == :manage ? %i[create read update destroy] : [a]
+    def resolve_alias(opts, new_name, old_name)
+      has_new = opts.key?(new_name)
+      has_old = opts.key?(old_name)
+
+      if has_new && has_old
+        raise ArgumentError, "cannot pass both :#{new_name} and :#{old_name}"
       end
+
+      has_new ? opts[new_name] : opts[old_name]
     end
 
-    # rubocop:disable Metrics/MethodLength
-    def make_permission(action, actions, klass, query: nil, predicate: nil, granted_by: nil)
-      has_query = query.is_a?(Proc)
-      has_predicate = predicate.is_a?(Proc)
-      permission = make_base_permission(action, klass, granted_by: granted_by)
+    def build_delegation(through)
+      return nil if through.nil?
 
-      if has_query && has_predicate
-        # Both query & predicate provided
-        permission.query = query
+      raise InvalidGrant, "through must be a [Class, Proc], got #{through.inspect}" unless valid_delegation?(through)
+
+      Delegation.new(klass: through[0], resolver: through[1])
+    end
+
+    def valid_delegation?(tuple)
+      tuple.is_a?(Array) && tuple.length == 2 && tuple[0].is_a?(Class) && tuple[1].is_a?(Proc)
+    end
+
+    def warn_unconditional_grant(action, klass)
+      warn "[papers_please] role.grant #{action.inspect}, #{klass.inspect} grants unconditional access. " \
+        "Pass if:/scope: or allow_all: true to make this explicit."
+    end
+
+    def make_permission(action, klass, scope: nil, predicate: nil, delegation: nil, collection: false, allow_all: false)
+      has_scope = !scope.nil?
+      has_predicate = !predicate.nil?
+      permission = Permission.new(action, klass, delegation: delegation, collection: collection)
+
+      if has_scope && has_predicate
+        permission.scope = scope
         permission.predicate = predicate
-      elsif has_query && !has_predicate
-        # Only query provided
-        permission.query = query
-        permission.predicate = build_predicate_from_query(action, actions, klass, query)
-      elsif !has_query && has_predicate
-        # Only predicate provided
+      elsif has_scope
+        permission.scope = scope
+        permission.predicate = collection ? (proc { |_u, _s| true }) : build_predicate_from_scope(klass, scope)
+      elsif has_predicate
         permission.predicate = predicate
-      else
-        # Neither provided
-        permission.query = (proc { klass.all })
-        permission.predicate = (proc { true })
+      elsif allow_all
+        permission.scope = build_unconditional_scope(klass)
+        permission.predicate = (proc { |_u, _s| true })
       end
 
       permission
     end
 
-    # rubocop:enable Metrics/MethodLength
+    def build_unconditional_scope(klass)
+      return proc { |_u, _k| klass.all } if klass.respond_to?(:all)
 
-    def make_base_permission(action, klass, granted_by: nil)
-      permission = Permission.new(action, klass)
-
-      if granted_by
-        permission.granting_class = granted_by[0]
-        permission.granted_by = granted_by[1]
-      end
-
-      permission
+      nil
     end
 
-    def build_predicate_from_query(action, actions, klass, query)
-      # If the action is :create, expanded from :manage
-      # then we set the default all predicate
-      return (proc { true }) if action == :create && actions == :manage
-
-      # Otherwise the default predicate is to check
-      # for inclusion in the returned relationship
+    def build_predicate_from_scope(klass, scope)
       proc do |user, obj|
-        res = query.call(user, klass, action)
-        res.respond_to?(:include?) && res.include?(obj)
+        class_backed_instance?(klass, obj) && included_in_scope?(scope.call(user, klass), obj)
+      end
+    end
+
+    def class_backed_instance?(klass, obj)
+      klass.is_a?(Class) && !!(Object.instance_method(:class).bind_call(obj) <= klass)
+    end
+
+    def included_in_scope?(scope_result, obj)
+      if scope_result.respond_to?(:exists?) && obj.respond_to?(:id)
+        scope_result.exists?(obj.id)
+      elsif scope_result.is_a?(Array) || scope_result.is_a?(Set)
+        scope_result.include?(obj)
+      else
+        false
       end
     end
   end
